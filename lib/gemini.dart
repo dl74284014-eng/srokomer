@@ -15,7 +15,8 @@ class GeminiResult {
   GeminiResult(this.names, this.category, this.expiry, this.rawDate);
 }
 
-const _models = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+// Быстрые модели без «размышлений» — ответ за 1–3 секунды
+const _models = ['gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];
 
 String _prompt() {
   final cats = [for (final c in cats_) c].join(', ');
@@ -66,7 +67,7 @@ Future<GeminiResult?> geminiRead(String imagePath) async {
             headers: {'x-goog-api-key': key, 'Content-Type': 'application/json'},
             body: body,
           )
-          .timeout(const Duration(seconds: 25));
+          .timeout(const Duration(seconds: 15));
       if (r.statusCode == 404) continue; // модель недоступна — пробуем следующую
       if (r.statusCode != 200) return null;
       final j = jsonDecode(utf8.decode(r.bodyBytes));

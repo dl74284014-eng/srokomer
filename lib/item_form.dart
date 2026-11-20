@@ -81,9 +81,9 @@ class _ItemFormPageState extends State<ItemFormPage> {
 
   Future<XFile?> _shoot({bool camera = true}) => picker.pickImage(
         source: camera ? ImageSource.camera : ImageSource.gallery,
-        maxWidth: 2000,
-        maxHeight: 2000,
-        imageQuality: 88,
+        maxWidth: 1400,
+        maxHeight: 1400,
+        imageQuality: 85,
       );
 
   Future<void> _changePhoto(bool camera) async {
@@ -297,10 +297,14 @@ class _ItemFormPageState extends State<ItemFormPage> {
         actions: [
           if (!widget.isNew)
             IconButton(onPressed: _delete, icon: const Icon(Icons.delete_outline), tooltip: t('delete')),
+          IconButton(onPressed: saving ? null : _save, icon: const Icon(Icons.check), tooltip: t('save')),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+      resizeToAvoidBottomInset: true,
+      body: Column(children: [
+        Expanded(
+          child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
         children: [
           if (widget.info.isNotEmpty) InfoNote(widget.info),
           // фото
@@ -466,17 +470,25 @@ class _ItemFormPageState extends State<ItemFormPage> {
             subtitle: Text(t('remember_sub')),
           ),
         ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-          child: FilledButton(
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
-            onPressed: saving ? null : _save,
-            child: Text(saving ? t('saving') : t('save'), style: const TextStyle(fontSize: 17)),
           ),
         ),
-      ),
+        // Кнопка «Сохранить» всегда над клавиатурой
+        Material(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          elevation: 6,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: FilledButton(
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                onPressed: saving ? null : _save,
+                child: Text(saving ? t('saving') : t('save'), style: const TextStyle(fontSize: 17)),
+              ),
+            ),
+          ),
+        ),
+      ]),
     );
   }
 }
