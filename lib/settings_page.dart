@@ -188,7 +188,7 @@ class _SettingsPageState extends State<SettingsPage> {
               Row(children: [
                 FilledButton.tonalIcon(
                   onPressed: syncer.running || !syncer.enabled ? null : syncer.syncNow,
-                  icon: const Icon(Icons.syncer),
+                  icon: const Icon(Icons.sync),
                   label: Text(t('sync_now')),
                 ),
               ]),
