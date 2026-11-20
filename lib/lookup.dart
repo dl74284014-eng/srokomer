@@ -3,51 +3,195 @@ import 'dart:convert';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:http/http.dart' as http;
 
-// ================= Поиск товара по штрих-коду в интернете =================
-class OnlineProduct {
-  final String name;
-  final String imageUrl;
-  final String hint;
-  OnlineProduct(this.name, this.imageUrl, this.hint);
+// ================= Поиск товара по штрих-коду =================
+// Порядок: 식약처 (C005 → I2570) → Open Food Facts → поиск Kakao (Daum).
+class LookupResult {
+  String name;
+  String maker;
+  String type;
+  String imageUrl;
+  String source;
+  bool guess; // true — название угадано по поиску, обязательно переспросить
+  List<String> alternatives;
+  LookupResult(this.name,
+      {this.maker = '', this.type = '', this.imageUrl = '', this.source = '', this.guess = false, List<String>? alternatives})
+      : alternatives = alternatives ?? [];
 }
 
-Future<OnlineProduct?> lookupOnline(String code) async {
-  if (!RegExp(r'^\d{8,14}$').hasMatch(code)) return null;
+const _timeout = Duration(seconds: 10);
+
+Future<LookupResult?> lookupBarcode(String code, {String mfdsKey = '', String kakaoKey = ''}) async {
+  LookupResult? r;
+  if (mfdsKey.isNotEmpty) {
+    r = await _mfds(mfdsKey, 'C005', 'BAR_CD', code);
+    r ??= await _mfds(mfdsKey, 'I2570', 'BRCD_NO', code);
+  }
+  r ??= await _off(code);
+  if (r == null && kakaoKey.isNotEmpty) r = await _kakaoGuess(kakaoKey, code);
+  if (r != null && r.imageUrl.isEmpty && kakaoKey.isNotEmpty) {
+    r.imageUrl = await kakaoImage(kakaoKey, r.name) ?? '';
+  }
+  return r;
+}
+
+String _s(Map m, String k) => (m[k] ?? '').toString().trim();
+
+/// 식품의약품안전처 OpenAPI (foodsafetykorea.go.kr)
+Future<LookupResult?> _mfds(String key, String svc, String param, String code) async {
   try {
-    final uri = Uri.parse(
-        'https://world.openfoodfacts.org/api/v2/product/$code.json?fields=product_name,product_name_ko,product_name_en,generic_name,brands,quantity,image_front_url,image_url,categories_tags');
-    final r = await http.get(uri, headers: {
-      'User-Agent': 'Srokomer/1.0 (Android; personal use)'
-    }).timeout(const Duration(seconds: 10));
+    final uri = Uri.parse('http://openapi.foodsafetykorea.go.kr/api/$key/$svc/json/1/5/$param=$code');
+    final r = await http.get(uri).timeout(_timeout);
     if (r.statusCode != 200) return null;
     final j = jsonDecode(utf8.decode(r.bodyBytes));
-    if (j is! Map || j['product'] is! Map) return null;
-    final p = Map<String, dynamic>.from(j['product'] as Map);
-    String s(String k) => (p[k] ?? '').toString().trim();
-    var name = s('product_name_ko');
-    if (name.isEmpty) name = s('product_name');
-    if (name.isEmpty) name = s('product_name_en');
-    if (name.isEmpty) name = s('generic_name');
+    if (j is! Map || j[svc] is! Map) return null;
+    final rows = (j[svc] as Map)['row'];
+    if (rows is! List || rows.isEmpty) return null;
+    final row = rows.first as Map;
+    final name = svc == 'C005' ? _s(row, 'PRDLST_NM') : (_s(row, 'PRDT_NM').isNotEmpty ? _s(row, 'PRDT_NM') : _s(row, 'PRDLST_NM'));
     if (name.isEmpty) return null;
-    final brand = s('brands').split(',').first.trim();
-    if (brand.isNotEmpty && !name.toLowerCase().contains(brand.toLowerCase())) {
-      name = '$brand $name';
-    }
-    final q = s('quantity');
-    if (q.isNotEmpty && !name.contains(q)) name = '$name $q';
-    final img = s('image_front_url').isNotEmpty ? s('image_front_url') : s('image_url');
-    final tags = (p['categories_tags'] is List) ? (p['categories_tags'] as List).join(' ') : '';
-    return OnlineProduct(name, img, tags);
+    final maker = svc == 'C005' ? _s(row, 'BSSH_NM') : _s(row, 'CMPNY_NM');
+    final type = svc == 'C005'
+        ? _s(row, 'PRDLST_DCNM')
+        : [_s(row, 'HRNK_PRDLST_NM'), _s(row, 'PRDLST_NM')].where((e) => e.isNotEmpty).join(' ');
+    return LookupResult(name, maker: maker, type: type, source: '식약처');
   } catch (_) {
     return null;
   }
 }
 
-Future<List<int>?> download(String url) async {
+/// Проверка ключа 식약처: null — работает, иначе текст ошибки.
+Future<String?> testMfdsKey(String key) async {
   try {
-    final r = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
-    if (r.statusCode == 200 && r.bodyBytes.isNotEmpty) return r.bodyBytes;
+    final r = await http
+        .get(Uri.parse('http://openapi.foodsafetykorea.go.kr/api/$key/C005/json/1/1'))
+        .timeout(_timeout);
+    if (r.statusCode != 200) return 'HTTP ${r.statusCode}';
+    final body = utf8.decode(r.bodyBytes);
+    final j = jsonDecode(body);
+    if (j is Map && j['C005'] is Map) {
+      final res = (j['C005'] as Map)['RESULT'];
+      final c = res is Map ? _s(res, 'CODE') : '';
+      if (c == 'INFO-000' || c == 'INFO-200') return null;
+      return res is Map ? '${_s(res, 'CODE')} ${_s(res, 'MSG')}' : body;
+    }
+    if (j is Map && j['RESULT'] is Map) return '${_s(j['RESULT'], 'CODE')} ${_s(j['RESULT'], 'MSG')}';
+    return body.length > 200 ? body.substring(0, 200) : body;
+  } catch (e) {
+    return '$e';
+  }
+}
+
+/// Open Food Facts (мировая база, корейских товаров немного)
+Future<LookupResult?> _off(String code) async {
+  if (!RegExp(r'^\d{8,14}$').hasMatch(code)) return null;
+  try {
+    final uri = Uri.parse(
+        'https://world.openfoodfacts.org/api/v2/product/$code.json?fields=product_name,product_name_ko,product_name_en,generic_name,brands,quantity,image_front_url,image_url,categories_tags');
+    final r = await http.get(uri, headers: {'User-Agent': 'Srokomer/1.1 (Android; personal use)'}).timeout(_timeout);
+    if (r.statusCode != 200) return null;
+    final j = jsonDecode(utf8.decode(r.bodyBytes));
+    if (j is! Map || j['product'] is! Map) return null;
+    final p = j['product'] as Map;
+    var name = _s(p, 'product_name_ko');
+    if (name.isEmpty) name = _s(p, 'product_name');
+    if (name.isEmpty) name = _s(p, 'product_name_en');
+    if (name.isEmpty) name = _s(p, 'generic_name');
+    if (name.isEmpty) return null;
+    final brand = _s(p, 'brands').split(',').first.trim();
+    if (brand.isNotEmpty && !name.toLowerCase().contains(brand.toLowerCase())) name = '$brand $name';
+    final q = _s(p, 'quantity');
+    if (q.isNotEmpty && !name.contains(q)) name = '$name $q';
+    final img = _s(p, 'image_front_url').isNotEmpty ? _s(p, 'image_front_url') : _s(p, 'image_url');
+    final tags = (p['categories_tags'] is List) ? (p['categories_tags'] as List).join(' ') : '';
+    return LookupResult(name, imageUrl: img, type: tags, source: 'Open Food Facts');
+  } catch (_) {
+    return null;
+  }
+}
+
+String _clean(String s) {
+  s = s
+      .replaceAll(RegExp(r'<[^>]+>'), '')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>');
+  // убрать хвосты вида " : 네이버 쇼핑", " - 쿠팡!", " | 사이트"
+  s = s.split(RegExp(r'\s[|:\-–]\s')).first;
+  return s.replaceAll(RegExp(r'\s+'), ' ').trim();
+}
+
+/// Поиск Kakao (Daum) по цифрам штрих-кода: заголовки страниц магазинов обычно содержат название.
+Future<LookupResult?> _kakaoGuess(String key, String code) async {
+  try {
+    final uri = Uri.https('dapi.kakao.com', '/v2/search/web', {'query': code, 'size': '15'});
+    final r = await http.get(uri, headers: {'Authorization': 'KakaoAK $key'}).timeout(_timeout);
+    if (r.statusCode != 200) return null;
+    final j = jsonDecode(utf8.decode(r.bodyBytes));
+    final docs = (j is Map && j['documents'] is List) ? j['documents'] as List : const [];
+    final titles = <String>[];
+    for (final d in docs) {
+      if (d is! Map) continue;
+      var tt = _clean(_s(d, 'title')).replaceAll(code, '').trim();
+      tt = tt.replaceAll(RegExp(r'^[\s\-:|,]+|[\s\-:|,]+$'), '');
+      if (tt.length < 2 || RegExp(r'^[\d\s]+$').hasMatch(tt)) continue;
+      if (!titles.contains(tt)) titles.add(tt);
+      if (titles.length >= 6) break;
+    }
+    if (titles.isEmpty) return null;
+    return LookupResult(titles.first, source: 'Daum', guess: true, alternatives: titles);
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Картинка товара через поиск изображений Kakao (Daum).
+Future<String?> kakaoImage(String key, String name) async {
+  try {
+    final uri = Uri.https('dapi.kakao.com', '/v2/search/image', {'query': name, 'size': '5'});
+    final r = await http.get(uri, headers: {'Authorization': 'KakaoAK $key'}).timeout(_timeout);
+    if (r.statusCode != 200) return null;
+    final j = jsonDecode(utf8.decode(r.bodyBytes));
+    final docs = (j is Map && j['documents'] is List) ? j['documents'] as List : const [];
+    for (final d in docs) {
+      if (d is Map) {
+        final u = _s(d, 'image_url');
+        final th = _s(d, 'thumbnail_url');
+        if (u.isNotEmpty || th.isNotEmpty) return '$u\n$th'; // основной + запасной URL
+      }
+    }
   } catch (_) {}
+  return null;
+}
+
+/// Проверка ключа Kakao: null — работает.
+Future<String?> testKakaoKey(String key) async {
+  try {
+    final uri = Uri.https('dapi.kakao.com', '/v2/search/image', {'query': '우유', 'size': '1'});
+    final r = await http.get(uri, headers: {'Authorization': 'KakaoAK $key'}).timeout(_timeout);
+    if (r.statusCode == 200) return null;
+    final b = utf8.decode(r.bodyBytes);
+    return 'HTTP ${r.statusCode} ${b.length > 200 ? b.substring(0, 200) : b}';
+  } catch (e) {
+    return '$e';
+  }
+}
+
+/// Скачивает картинку (поддерживает несколько URL через перевод строки — берёт первый рабочий).
+Future<List<int>?> download(String urls) async {
+  for (final url in urls.split('\n')) {
+    if (url.trim().isEmpty) continue;
+    try {
+      final r = await http.get(Uri.parse(url.trim()), headers: {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36'
+      }).timeout(const Duration(seconds: 12));
+      final ct = r.headers['content-type'] ?? '';
+      if (r.statusCode == 200 && r.bodyBytes.length > 500 && (ct.isEmpty || ct.startsWith('image'))) {
+        return r.bodyBytes;
+      }
+    } catch (_) {}
+  }
   return null;
 }
 

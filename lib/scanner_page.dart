@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'l10n.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -46,7 +48,7 @@ class _ScannerPageState extends State<ScannerPage> {
     final v = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Цифры штрих-кода'),
+        title: Text(t('digits_title')),
         content: TextField(
           controller: c,
           autofocus: true,
@@ -54,8 +56,8 @@ class _ScannerPageState extends State<ScannerPage> {
           decoration: const InputDecoration(hintText: '8801234567890'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, c.text.trim()), child: const Text('Готово')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t('cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, c.text.trim()), child: Text(t('done'))),
         ],
       ),
     );
@@ -123,10 +125,10 @@ class _ScannerPageState extends State<ScannerPage> {
                         color: Colors.black54,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Text(
-                        'Наведите камеру на штрих-код —\nон считается автоматически',
+                      child: Text(
+                        t('aim'),
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white, fontSize: 15),
+                        style: const TextStyle(color: Colors.white, fontSize: 15),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -135,7 +137,7 @@ class _ScannerPageState extends State<ScannerPage> {
                         Expanded(
                           child: FilledButton.tonal(
                             onPressed: _typeCode,
-                            child: const Text('Ввести цифры'),
+                            child: Text(t('type_digits')),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -145,7 +147,7 @@ class _ScannerPageState extends State<ScannerPage> {
                               done = true;
                               Navigator.pop(context, ScannerPage.manual);
                             },
-                            child: const Text('Нет штрих-кода'),
+                            child: Text(t('no_code')),
                           ),
                         ),
                       ],

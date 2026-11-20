@@ -45,8 +45,11 @@ jobs:
           flutter pub get
           dart run flutter_launcher_icons
 
+      - name: Check Dart code
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings lib
+
       - name: Build APK
-        run: flutter build apk --release --build-number=${{ github.run_number }} --build-name=1.0.${{ github.run_number }}
+        run: flutter build apk --release --build-number=${{ github.run_number }} --build-name=1.1.${{ github.run_number }}
 
       - name: Rename
         run: cp build/app/outputs/flutter-apk/app-release.apk srokomer.apk
@@ -54,8 +57,8 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: Срокомер 1.0.${{ github.run_number }}
+          tag_name: v1.1.${{ github.run_number }}
+          name: Срокомер 1.1.${{ github.run_number }}
           body: Скачайте srokomer.apk и установите поверх старой версии — данные сохранятся.
           files: srokomer.apk
           make_latest: true

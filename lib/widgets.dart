@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'l10n.dart';
+
 class InfoNote extends StatelessWidget {
   final String text;
   const InfoNote(this.text, {super.key});
@@ -71,8 +73,8 @@ Future<bool?> askThisOne(BuildContext context,
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Нет')),
-        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Да, верно')),
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('no'))),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('yes'))),
       ],
     ),
   );
@@ -92,9 +94,8 @@ Future<String?> pickLines(BuildContext context, List<String> lines) {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Отметьте строки названия',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-              const Text('Можно несколько — они склеятся по порядку'),
+              Text(t('mark_lines'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              Text(t('mark_lines_sub')),
               const SizedBox(height: 8),
               Flexible(
                 child: ListView(
@@ -114,7 +115,7 @@ Future<String?> pickLines(BuildContext context, List<String> lines) {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(ctx, ''),
-                    child: const Text('Введу сам'),
+                    child: Text(t('type_myself')),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -126,12 +127,46 @@ Future<String?> pickLines(BuildContext context, List<String> lines) {
                             final l = sel.toList()..sort();
                             Navigator.pop(ctx, l.map((i) => lines[i]).join(' '));
                           },
-                    child: const Text('Готово'),
+                    child: Text(t('done')),
                   ),
                 ),
               ]),
             ],
           ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Выбор одного варианта из списка. null — ничего не подошло.
+Future<String?> pickOne(BuildContext context, String title, List<String> options) {
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final o in options)
+                    ListTile(
+                      title: Text(o, style: const TextStyle(fontSize: 16)),
+                      onTap: () => Navigator.pop(ctx, o),
+                    ),
+                ],
+              ),
+            ),
+            OutlinedButton(onPressed: () => Navigator.pop(ctx), child: Text(t('none_of_these'))),
+          ],
         ),
       ),
     ),

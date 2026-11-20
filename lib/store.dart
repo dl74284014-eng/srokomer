@@ -9,6 +9,7 @@ import 'models.dart';
 class Store extends ChangeNotifier {
   List<Item> items = [];
   Map<String, Product> products = {};
+  Map<String, String> settings = {};
   late Directory dir;
   late Directory photoDir;
 
@@ -27,6 +28,8 @@ class Store extends ChangeNotifier {
         final p = (j['products'] as Map?) ?? {};
         products = p.map((k, v) =>
             MapEntry(k.toString(), Product.fromJson(Map<String, dynamic>.from(v as Map))));
+        final st = (j['settings'] as Map?) ?? {};
+        settings = st.map((k, v) => MapEntry(k.toString(), v.toString()));
       }
     } catch (e) {
       debugPrint('load error $e');
@@ -38,6 +41,7 @@ class Store extends ChangeNotifier {
     await tmp.writeAsString(jsonEncode({
       'items': items.map((e) => e.toJson()).toList(),
       'products': products.map((k, v) => MapEntry(k, v.toJson())),
+      'settings': settings,
     }));
     await tmp.rename(_file.path);
   }
@@ -56,6 +60,12 @@ class Store extends ChangeNotifier {
   Future<void> deleteItem(String id) async {
     items.removeWhere((x) => x.id == id);
     notifyListeners();
+    await _save();
+  }
+
+  Future<void> setSetting(String k, String v) async {
+    settings[k] = v;
+    if (k == 'lang') notifyListeners();
     await _save();
   }
 

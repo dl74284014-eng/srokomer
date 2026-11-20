@@ -133,14 +133,6 @@ String plural(int n, String a, String b, String c) {
   return c;
 }
 
-String leftText(int? dl) {
-  if (dl == null) return 'срок не указан';
-  if (dl < 0) return 'просрочено ${-dl} ${plural(-dl, 'день', 'дня', 'дней')} назад';
-  if (dl == 0) return 'сегодня последний день';
-  if (dl == 1) return 'остался 1 день (до завтра)';
-  return 'осталось $dl ${plural(dl, 'день', 'дня', 'дней')}';
-}
-
 enum Urg { red, orange, yellow, green, none }
 
 Urg urgency(int? dl) {
@@ -185,17 +177,17 @@ Color urgSoft(Urg u) {
 const _catWords = <String, List<String>>{
   'kimchi': ['김치', '반찬', '깍두기', '단무지', '장아찌', '젓갈', 'kimchi'],
   'tofu': ['두부', '계란', '달걀', '메추리', 'egg', 'tofu'],
-  'noodle': ['라면', '우동', '국수', '짜파게티', '냉면', '쫄면', '소바', '파스타', 'noodle', 'ramen', 'pasta'],
+  'noodle': ['면류', '라면', '우동', '국수', '짜파게티', '냉면', '쫄면', '소바', '파스타', 'noodle', 'ramen', 'pasta'],
   'frozen': ['냉동', '아이스', '만두', 'frozen', 'ice cream', 'ice-cream'],
-  'milk': ['우유', '요거트', '요구르트', '치즈', '버터', '생크림', '유제품', 'milk', 'yogurt', 'cheese', 'dairies', 'butter'],
-  'meat': ['돼지', '소고기', '한우', '닭', '삼겹', '목살', '햄', '소시지', '베이컨', '육포', 'meat', 'sausage', 'ham', 'bacon', 'chicken'],
+  'milk': ['발효유', '유가공', '우유', '요거트', '요구르트', '치즈', '버터', '생크림', '유제품', 'milk', 'yogurt', 'cheese', 'dairies', 'butter'],
+  'meat': ['식육', '돼지', '소고기', '한우', '닭', '삼겹', '목살', '햄', '소시지', '베이컨', '육포', 'meat', 'sausage', 'ham', 'bacon', 'chicken'],
   'fish': ['생선', '고등어', '연어', '새우', '오징어', '어묵', '수산', '맛살', '멸치', '꽃게', '조개', 'fish', 'seafood', 'shrimp'],
-  'sauce': ['소스', '고추장', '된장', '간장', '케첩', '마요', '양념', '식초', '쌈장', '드레싱', 'sauce', 'condiment', 'ketchup'],
-  'snack': ['과자', '초콜릿', '초코', '사탕', '젤리', '쿠키', '스낵', '칩', '비스킷', '껌', 'snack', 'chocolate', 'candy', 'biscuit', 'cookie', 'chips'],
-  'bread': ['빵', '식빵', '케이크', '베이커리', '베이글', '머핀', 'bread', 'cake', 'bakery'],
-  'ready': ['도시락', '김밥', '삼각', '즉석', '컵밥', '샌드위치', '밀키트', 'meal', 'sandwich'],
+  'sauce': ['장류', '조미', '소스', '고추장', '된장', '간장', '케첩', '마요', '양념', '식초', '쌈장', '드레싱', 'sauce', 'condiment', 'ketchup'],
+  'snack': ['과자류', '캔디', '과자', '초콜릿', '초코', '사탕', '젤리', '쿠키', '스낵', '칩', '비스킷', '껌', 'snack', 'chocolate', 'candy', 'biscuit', 'cookie', 'chips'],
+  'bread': ['빵류', '빵', '식빵', '케이크', '베이커리', '베이글', '머핀', 'bread', 'cake', 'bakery'],
+  'ready': ['즉석', '간편조리', '도시락', '김밥', '삼각', '즉석', '컵밥', '샌드위치', '밀키트', 'meal', 'sandwich'],
   'veg': ['사과', '배추', '양파', '감자', '바나나', '채소', '야채', '과일', '샐러드', '버섯', '토마토', 'fruit', 'vegetable', 'salad'],
-  'drink': ['음료', '주스', '콜라', '사이다', '커피', '녹차', '홍차', '생수', '맥주', '소주', '막걸리', '탄산', '이온', '우롱', 'juice', 'drink', 'beverage', 'water', 'coffee', 'tea', 'soda', 'beer'],
+  'drink': ['음료류', '다류', '음료', '주스', '콜라', '사이다', '커피', '녹차', '홍차', '생수', '맥주', '소주', '막걸리', '탄산', '이온', '우롱', 'juice', 'drink', 'beverage', 'water', 'coffee', 'tea', 'soda', 'beer'],
   'grocery': ['쌀', '밀가루', '설탕', '소금', '식용유', '참기름', '통조림', '참치', '햇반', '시리얼', 'flour', 'oil', 'canned', 'rice', 'cereal'],
 };
 

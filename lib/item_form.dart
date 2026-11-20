@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+
+import 'l10n.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'lookup.dart';
@@ -89,15 +91,15 @@ class _ItemFormPageState extends State<ItemFormPage> {
   Future<void> _ocrName() async {
     final x = await _shoot();
     if (x == null || !mounted) return;
-    final lines = await withLoading(context, 'Читаю текст…', () => ocrLines(x.path));
+    final lines = await withLoading(context, t('reading_text'), () => ocrLines(x.path));
     if (!mounted) return;
     final c = nameCandidates(lines);
     if (c.isEmpty) {
-      _snack('Текст не найден — снимите ближе и ровнее');
+      _snack(t('no_text'));
       return;
     }
     String? chosen;
-    final ans = await askThisOne(context, title: 'Это название?', text: c.first, imagePath: x.path);
+    final ans = await askThisOne(context, title: t('is_name_q'), text: c.first, imagePath: x.path);
     if (!mounted) return;
     if (ans == true) {
       chosen = c.first;
@@ -122,18 +124,18 @@ class _ItemFormPageState extends State<ItemFormPage> {
   Future<void> _ocrDate() async {
     final x = await _shoot();
     if (x == null || !mounted) return;
-    final lines = await withLoading(context, 'Ищу срок годности…', () => ocrLines(x.path));
+    final lines = await withLoading(context, t('finding_date'), () => ocrLines(x.path));
     if (!mounted) return;
     final f = findExpiry(lines);
     if (f == null) {
-      _snack('Дату не нашёл — выберите вручную');
+      _snack(t('no_date_found'));
       return;
     }
     final ok = await askThisOne(
       context,
-      title: 'Срок годности верный?',
-      text: 'до ${fmtDate(f.iso)}',
-      sub: 'на упаковке: ${f.raw} · ${leftText(daysLeft(f.iso))}',
+      title: t('date_ok_q'),
+      text: '${t('until')} ${fmtDate(f.iso)}',
+      sub: '${t('on_pack')}: ${f.raw} · ${leftText(daysLeft(f.iso))}',
       imagePath: x.path,
     );
     if (ok == true) setState(() => expiry = f.iso);
@@ -146,7 +148,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
       initialDate: init,
       firstDate: DateTime(2020),
       lastDate: DateTime(2045),
-      helpText: 'Годен до',
+      helpText: t('valid_until'),
     );
     if (d != null) setState(() => expiry = isoOf(d));
   }
@@ -158,7 +160,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
 
   Future<void> _save() async {
     if (name.text.trim().isEmpty) {
-      _snack('Введите название');
+      _snack(t('enter_name'));
       nameFocus.requestFocus();
       return;
     }
@@ -166,11 +168,11 @@ class _ItemFormPageState extends State<ItemFormPage> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Срок годности не указан'),
-          content: const Text('Сохранить без даты?'),
+          title: Text(t('no_exp_title')),
+          content: Text(t('no_exp_text')),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Без даты')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Указать дату')),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('without_date'))),
+            FilledButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('set_date'))),
           ],
         ),
       );
@@ -204,14 +206,14 @@ class _ItemFormPageState extends State<ItemFormPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Удалить «${name.text}»?'),
-        content: const Text('Например, если товар продан или списан.'),
+        title: Text(tf('delete_q', {'name': name.text})),
+        content: Text(t('delete_sub')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('cancel'))),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFFD6363B)),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Удалить'),
+            child: Text(t('delete')),
           ),
         ],
       ),
@@ -233,10 +235,10 @@ class _ItemFormPageState extends State<ItemFormPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.isNew ? 'Новый товар' : 'Товар'),
+        title: Text(widget.isNew ? t('new_item') : t('item')),
         actions: [
           if (!widget.isNew)
-            IconButton(onPressed: _delete, icon: const Icon(Icons.delete_outline), tooltip: 'Удалить'),
+            IconButton(onPressed: _delete, icon: const Icon(Icons.delete_outline), tooltip: t('delete')),
         ],
       ),
       body: ListView(
@@ -260,7 +262,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
               child: OutlinedButton.icon(
                 onPressed: () => _changePhoto(true),
                 icon: const Icon(Icons.photo_camera_outlined),
-                label: const Text('Фото товара'),
+                label: Text(t('photo_cam')),
               ),
             ),
             const SizedBox(width: 8),
@@ -268,7 +270,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
               child: OutlinedButton.icon(
                 onPressed: () => _changePhoto(false),
                 icon: const Icon(Icons.photo_library_outlined),
-                label: const Text('Из галереи'),
+                label: Text(t('photo_gal')),
               ),
             ),
           ]),
@@ -280,10 +282,10 @@ class _ItemFormPageState extends State<ItemFormPage> {
                 controller: name,
                 focusNode: nameFocus,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Название',
-                  hintText: 'например, 서울우유 1L',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: t('name'),
+                  hintText: t('name_hint'),
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ),
@@ -293,22 +295,22 @@ class _ItemFormPageState extends State<ItemFormPage> {
               child: FilledButton.tonalIcon(
                 onPressed: _ocrName,
                 icon: const Icon(Icons.document_scanner_outlined),
-                label: const Text('Считать'),
+                label: Text(t('read')),
               ),
             ),
           ]),
           const SizedBox(height: 8),
           TextField(
             controller: nameRu,
-            decoration: const InputDecoration(
-              labelText: 'По-русски (необязательно)',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t('translation'),
+              border: const OutlineInputBorder(),
               isDense: true,
             ),
           ),
           gap,
           // срок
-          Text('Срок годности — до какого числа',
+          Text(t('exp_title'),
               style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           Row(children: [
@@ -317,7 +319,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
                 style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                 onPressed: _pickDate,
                 icon: const Icon(Icons.event),
-                label: Text(expiry.isEmpty ? 'Выбрать дату' : fmtDate(expiry),
+                label: Text(expiry.isEmpty ? t('pick_date') : fmtDate(expiry),
                     style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
               ),
             ),
@@ -327,19 +329,19 @@ class _ItemFormPageState extends State<ItemFormPage> {
               child: FilledButton.tonalIcon(
                 onPressed: _ocrDate,
                 icon: const Icon(Icons.document_scanner_outlined),
-                label: const Text('Считать'),
+                label: Text(t('read')),
               ),
             ),
           ]),
           const SizedBox(height: 8),
           Wrap(spacing: 6, runSpacing: 6, children: [
-            ActionChip(label: const Text('Сегодня'), onPressed: () => _quick()),
-            ActionChip(label: const Text('Завтра'), onPressed: () => _quick(days: 1)),
-            ActionChip(label: const Text('+3 дня'), onPressed: () => _quick(days: 3)),
-            ActionChip(label: const Text('+7 дней'), onPressed: () => _quick(days: 7)),
-            ActionChip(label: const Text('+14 дней'), onPressed: () => _quick(days: 14)),
-            ActionChip(label: const Text('+1 мес'), onPressed: () => _quick(months: 1)),
-            ActionChip(label: const Text('+3 мес'), onPressed: () => _quick(months: 3)),
+            ActionChip(label: Text(t('q_today')), onPressed: () => _quick()),
+            ActionChip(label: Text(t('q_tomorrow')), onPressed: () => _quick(days: 1)),
+            ActionChip(label: Text(t('q_3')), onPressed: () => _quick(days: 3)),
+            ActionChip(label: Text(t('q_7')), onPressed: () => _quick(days: 7)),
+            ActionChip(label: Text(t('q_14')), onPressed: () => _quick(days: 14)),
+            ActionChip(label: Text(t('q_1m')), onPressed: () => _quick(months: 1)),
+            ActionChip(label: Text(t('q_3m')), onPressed: () => _quick(months: 3)),
           ]),
           if (expiry.isNotEmpty)
             Padding(
@@ -352,10 +354,10 @@ class _ItemFormPageState extends State<ItemFormPage> {
           DropdownButtonFormField<String>(
             value: category,
             isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Категория', border: OutlineInputBorder()),
+            decoration: InputDecoration(labelText: t('category'), border: const OutlineInputBorder()),
             items: [
               for (final x in cats)
-                DropdownMenuItem(value: x.k, child: Text('${x.e}  ${x.n} · ${x.ko}')),
+                DropdownMenuItem(value: x.k, child: Text('${x.e}  ${catName(x)}')),
             ],
             onChanged: (v) => setState(() => category = v ?? 'other'),
           ),
@@ -370,7 +372,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
                 IconButton(
                     onPressed: () => setState(() => qty = qty > 1 ? qty - 1 : 1),
                     icon: const Icon(Icons.remove)),
-                Text('$qty шт.', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                Text('$qty ${t('pcs')}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 IconButton(onPressed: () => setState(() => qty++), icon: const Icon(Icons.add)),
               ]),
             ),
@@ -380,30 +382,30 @@ class _ItemFormPageState extends State<ItemFormPage> {
                 controller: code,
                 keyboardType: TextInputType.number,
                 onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(labelText: 'Штрих-код', border: OutlineInputBorder()),
+                decoration: InputDecoration(labelText: t('barcode'), border: const OutlineInputBorder()),
               ),
             ),
           ]),
           if (same.isNotEmpty)
-            InfoNote('В списке уже есть с этим штрих-кодом: ' +
-                same.map((o) => 'до ${fmtDate(o.expiry)}${o.qty > 1 ? ' ×${o.qty}' : ''}').join(', ')),
+            InfoNote(t('same_code') +
+                same.map((o) => '${t('until')} ${fmtDate(o.expiry)}${o.qty > 1 ? ' ×${o.qty}' : ''}').join(', ')),
           gap,
           TextField(
             controller: notes,
             minLines: 2,
             maxLines: 5,
-            decoration: const InputDecoration(
-              labelText: 'Заметки',
-              hintText: 'полка, поставщик, скидка…',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t('notes'),
+              hintText: t('notes_hint'),
+              border: const OutlineInputBorder(),
             ),
           ),
           CheckboxListTile(
             contentPadding: EdgeInsets.zero,
             value: remember,
             onChanged: (v) => setState(() => remember = v ?? true),
-            title: const Text('Запомнить товар по штрих-коду'),
-            subtitle: const Text('В следующий раз название и фото подставятся сами'),
+            title: Text(t('remember')),
+            subtitle: Text(t('remember_sub')),
           ),
         ],
       ),
@@ -413,7 +415,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
           child: FilledButton(
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
             onPressed: saving ? null : _save,
-            child: Text(saving ? 'Сохраняю…' : 'Сохранить', style: const TextStyle(fontSize: 17)),
+            child: Text(saving ? t('saving') : t('save'), style: const TextStyle(fontSize: 17)),
           ),
         ),
       ),

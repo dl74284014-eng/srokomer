@@ -3,6 +3,10 @@
 set -euo pipefail
 
 M=android/app/src/main/AndroidManifest.xml
+# 식약처 API работает только по http — разрешаем
+if ! grep -q usesCleartextTraffic "$M"; then
+  sed -i 's#<application#<application android:usesCleartextTraffic="true"#' "$M"
+fi
 if ! grep -q 'android.permission.CAMERA' "$M"; then
   sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.CAMERA"/>\n    <application#' "$M"
 fi

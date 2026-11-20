@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'item_form.dart';
+import 'l10n.dart';
+import 'settings_page.dart';
 import 'lookup.dart';
 import 'models.dart';
 import 'scanner_page.dart';
@@ -23,7 +25,9 @@ class SrokomerApp extends StatelessWidget {
   const SrokomerApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) => MaterialApp(
       title: 'Срокомер',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -32,7 +36,7 @@ class SrokomerApp extends StatelessWidget {
         scaffoldBackgroundColor: bg,
         appBarTheme: const AppBarTheme(backgroundColor: bg, surfaceTintColor: Colors.transparent),
       ),
-      locale: const Locale('ru'),
+      locale: Locale(lang),
       supportedLocales: const [Locale('ru'), Locale('ko'), Locale('en')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -40,6 +44,7 @@ class SrokomerApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       home: const HomePage(),
+    ),
     );
   }
 }
@@ -50,13 +55,8 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-const sortNames = {
-  'soon': 'Срок: ближе',
-  'late': 'Срок: дальше',
-  'az': 'А → Я',
-  'za': 'Я → А',
-  'new': 'Недавние',
-};
+const sortKeys = ['soon', 'late', 'az', 'za', 'new'];
+String sortName(String k) => t('sort_$k');
 
 class _HomePageState extends State<HomePage> {
   String cat = 'all';
@@ -82,46 +82,65 @@ class _HomePageState extends State<HomePage> {
         context, MaterialPageRoute(builder: (_) => const ScannerPage()));
     if (code == null || !mounted) return;
     if (code == ScannerPage.manual) {
-      _openForm(Item(id: newId()),
-          info: 'Нажмите «Считать» рядом с названием — сфотографируйте упаковку, и текст подставится сам.',
-          autoOcr: true);
+      _openForm(Item(id: newId()), info: t('no_barcode_info'), autoOcr: true);
       return;
     }
     final known = store.products[code];
     if (known != null) {
       _openForm(
         Item(id: newId(), name: known.name, nameRu: known.nameRu, category: known.category, barcode: code, photo: known.photo),
-        info: 'Знакомый товар — осталось указать срок годности.',
+        info: t('known'),
       );
       return;
     }
-    final found = await withLoading(context, 'Штрих-код $code\nИщу товар в интернете…', () async {
-      final p = await lookupOnline(code);
+    final mfdsKey = store.settings['mfdsKey'] ?? '';
+    final kakaoKey = store.settings['kakaoKey'] ?? '';
+    final found = await withLoading(context, tf('searching', {'code': code}), () async {
+      final r = await lookupBarcode(code, mfdsKey: mfdsKey, kakaoKey: kakaoKey);
       var photo = '';
-      if (p != null && p.imageUrl.isNotEmpty) {
-        final bytes = await download(p.imageUrl);
+      if (r != null && r.imageUrl.isNotEmpty) {
+        final bytes = await download(r.imageUrl);
         if (bytes != null) photo = await store.savePhotoBytes(bytes);
       }
-      return (p: p, photo: photo);
+      return (r: r, photo: photo);
     });
     if (!mounted) return;
-    final p = found.p;
-    if (p != null) {
-      final ok = await askThisOne(context,
-          title: 'Нашёл в интернете. Это оно?', text: p.name, imagePath: found.photo);
-      if (ok == null || !mounted) return;
-      _openForm(
-        Item(id: newId(), name: p.name, category: guessCategory('${p.name} ${p.hint}'), barcode: code, photo: found.photo),
-        focusName: ok == false,
-        info: ok == false ? 'Исправьте название или нажмите «Считать», чтобы взять его с упаковки.' : '',
-      );
-    } else {
-      _openForm(
-        Item(id: newId(), barcode: code),
-        info: 'Штрих-код $code в интернете не найден. Сфотографируйте название на упаковке — я считаю текст и переспрошу.',
-        autoOcr: true,
-      );
+    final r = found.r;
+    final noKeysHint = (mfdsKey.isEmpty || kakaoKey.isEmpty) ? '\n\n${t('keys_hint')}' : '';
+    if (r == null) {
+      _openForm(Item(id: newId(), barcode: code),
+          info: tf('not_found', {'code': code}) + noKeysHint, autoOcr: true);
+      return;
     }
+    final sub = [
+      if (r.maker.isNotEmpty) r.maker,
+      if (r.type.isNotEmpty && !r.type.contains(':')) r.type,
+      '${t('source')}: ${r.source}',
+    ].join(' · ');
+    final ok = await askThisOne(context,
+        title: r.guess ? t('guess_q') : t('found_q'), text: r.name, sub: sub, imagePath: found.photo);
+    if (ok == null || !mounted) return;
+    var name = r.name;
+    var confirmed = ok;
+    if (!ok && r.alternatives.length > 1) {
+      final pick = await pickOne(context, t('pick_variant'), r.alternatives.skip(1).toList());
+      if (!mounted) return;
+      if (pick != null) {
+        name = pick;
+        confirmed = true;
+      }
+    }
+    _openForm(
+      Item(
+        id: newId(),
+        name: name,
+        category: guessCategory('$name ${r.type}'),
+        barcode: code,
+        photo: found.photo,
+      ),
+      focusName: !confirmed,
+      info: confirmed ? '' : t('fix_name'),
+    );
   }
 
   // ---------------- данные для списка ----------------
@@ -161,11 +180,11 @@ class _HomePageState extends State<HomePage> {
 
   String _groupText(List<Item> l) {
     final m = _minDays(l);
-    final n = '${l.length} шт.';
-    if (m == null) return '$n · без сроков';
-    if (m < 0) return '$n · есть просроченное';
-    if (m == 0) return '$n · ближайший: сегодня';
-    return '$n · ближайший: через $m ${plural(m, 'день', 'дня', 'дней')}';
+    final n = '${l.length} ${t('pcs')}';
+    if (m == null) return '$n · ${t('no_dates')}';
+    if (m < 0) return '$n · ${t('has_expired')}';
+    if (m == 0) return '$n · ${t('nearest_today')}';
+    return '$n · ${tf('nearest_in', {'n': m, 'd': daysWord(m)})}';
   }
 
   // ---------------- UI ----------------
@@ -173,11 +192,22 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Row(children: [
-          Text('🛒 Срокомер', style: TextStyle(fontWeight: FontWeight.w800)),
-          SizedBox(width: 8),
-          Text('유통기한', style: TextStyle(fontSize: 13, color: Colors.black54)),
+        title: Row(children: [
+          const Text('🛒 ', style: TextStyle(fontWeight: FontWeight.w800)),
+          Text(isKo ? '유통기한 체크' : 'Срокомер', style: const TextStyle(fontWeight: FontWeight.w800)),
+          const SizedBox(width: 8),
+          Text(isKo ? 'Срокомер' : '유통기한', style: const TextStyle(fontSize: 13, color: Colors.black54)),
         ]),
+        actions: [
+          IconButton(
+            tooltip: t('settings'),
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage()));
+              if (mounted) setState(() {});
+            },
+          ),
+        ],
       ),
       body: ListenableBuilder(
         listenable: store,
@@ -191,7 +221,7 @@ class _HomePageState extends State<HomePage> {
             heroTag: 'add',
             backgroundColor: Colors.white,
             onPressed: () => _openForm(Item(id: newId())),
-            tooltip: 'Добавить вручную',
+            tooltip: t('add_manual'),
             child: const Icon(Icons.add),
           ),
           const SizedBox(width: 14),
@@ -201,7 +231,7 @@ class _HomePageState extends State<HomePage> {
             foregroundColor: Colors.white,
             onPressed: _scan,
             icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('Сканировать', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            label: Text(t('scan'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -226,10 +256,9 @@ class _HomePageState extends State<HomePage> {
     ];
 
     if (store.items.isEmpty) {
-      children.add(const _Empty(
-          '📦', 'Пока пусто', 'Нажмите «Сканировать» и наведите камеру на штрих-код — название и фото подставятся сами, останется выбрать срок годности.'));
+      children.add(_Empty('📦', t('empty_title'), t('empty_text')));
     } else if (base.isEmpty) {
-      children.add(const _Empty('🔍', 'Ничего не найдено', ''));
+      children.add(_Empty('🔍', t('nothing'), ''));
     } else if (cat != 'all') {
       final l = [...byCat[cat]!]..sort(cmp);
       final c = catOf(cat);
@@ -242,7 +271,7 @@ class _HomePageState extends State<HomePage> {
       } else if (sort == 'late') {
         groups.sort((a, b) => (_minDays(byCat[b.k]!) ?? -(1 << 30)).compareTo(_minDays(byCat[a.k]!) ?? -(1 << 30)));
       } else if (sort == 'az' || sort == 'za') {
-        groups.sort((a, b) => sort == 'az' ? a.n.compareTo(b.n) : b.n.compareTo(a.n));
+        groups.sort((a, b) => sort == 'az' ? catName(a).compareTo(catName(b)) : catName(b).compareTo(catName(a)));
       }
       for (final c in groups) {
         final l = [...byCat[c.k]!]..sort(cmp);
@@ -289,10 +318,10 @@ class _HomePageState extends State<HomePage> {
     }
 
     return Row(children: [
-      cell(Urg.red, red, 'просрочено', urgColor(Urg.red)),
-      cell(Urg.orange, orange, '≤ 3 дней', urgColor(Urg.orange)),
-      cell(Urg.yellow, yellow, '≤ 7 дней', urgColor(Urg.yellow)),
-      cell(null, store.items.length, 'всего', Colors.black87),
+      cell(Urg.red, red, t('expired'), urgColor(Urg.red)),
+      cell(Urg.orange, orange, t('le3'), urgColor(Urg.orange)),
+      cell(Urg.yellow, yellow, t('le7'), urgColor(Urg.yellow)),
+      cell(null, store.items.length, t('total'), Colors.black87),
     ]);
   }
 
@@ -302,7 +331,7 @@ class _HomePageState extends State<HomePage> {
         child: TextField(
           onChanged: (v) => setState(() => q = v),
           decoration: InputDecoration(
-            hintText: 'Поиск: название, заметка, штрих-код',
+            hintText: t('search'),
             prefixIcon: const Icon(Icons.search),
             isDense: true,
             filled: true,
@@ -316,7 +345,7 @@ class _HomePageState extends State<HomePage> {
         initialValue: sort,
         onSelected: (v) => setState(() => sort = v),
         itemBuilder: (_) => [
-          for (final e in sortNames.entries) PopupMenuItem(value: e.key, child: Text(e.value)),
+          for (final k in sortKeys) PopupMenuItem(value: k, child: Text(sortName(k))),
         ],
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
@@ -324,7 +353,7 @@ class _HomePageState extends State<HomePage> {
           child: Row(children: [
             const Icon(Icons.sort, size: 20),
             const SizedBox(width: 4),
-            Text(sortNames[sort]!, style: const TextStyle(fontSize: 13)),
+            Text(sortName(sort), style: const TextStyle(fontSize: 13)),
           ]),
         ),
       ),
@@ -366,10 +395,10 @@ class _HomePageState extends State<HomePage> {
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
-          chip('all', 'Все', total, null),
+          chip('all', t('all'), total, null),
           for (final c in cats)
             if (byCat.containsKey(c.k))
-              chip(c.k, '${c.e} ${c.n}', byCat[c.k]!.length, urgColor(urgency(_minDays(byCat[c.k]!)))),
+              chip(c.k, '${c.e} ${catName(c)}', byCat[c.k]!.length, urgColor(urgency(_minDays(byCat[c.k]!)))),
         ],
       ),
     );
@@ -378,7 +407,7 @@ class _HomePageState extends State<HomePage> {
   Widget _groupHeader(Cat c, List<Item> l) => Padding(
         padding: const EdgeInsets.fromLTRB(4, 16, 4, 6),
         child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text('${c.e} ${c.n}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          Text('${c.e} ${catName(c)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const Spacer(),
           Text(_groupText(l), style: const TextStyle(fontSize: 12.5, color: Colors.black54)),
         ]),
@@ -390,7 +419,7 @@ class _HomePageState extends State<HomePage> {
     final c = catOf(it.category);
     final hasPhoto = it.photo.isNotEmpty && File(it.photo).existsSync();
     final sub = [
-      'до ${fmtDate(it.expiry)}',
+      '${t('until')} ${fmtDate(it.expiry)}',
       if (it.nameRu.isNotEmpty) it.nameRu,
       if (it.notes.isNotEmpty) '📝 ${it.notes}',
     ].join(' · ');
@@ -422,7 +451,7 @@ class _HomePageState extends State<HomePage> {
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(
-                    it.name.isEmpty ? 'Без названия' : (it.qty > 1 ? '${it.name}  ×${it.qty}' : it.name),
+                    it.name.isEmpty ? t('no_name') : (it.qty > 1 ? '${it.name}  ×${it.qty}' : it.name),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
@@ -444,12 +473,12 @@ class _HomePageState extends State<HomePage> {
                       style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: urgColor(u))),
                   Text(
                     dl == null
-                        ? 'нет даты'
+                        ? t('no_date')
                         : dl < 0
-                            ? 'просрочено'
+                            ? t('expired')
                             : dl == 0
-                                ? 'сегодня'
-                                : plural(dl, 'день', 'дня', 'дней'),
+                                ? t('today')
+                                : daysWord(dl),
                     style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: urgColor(u)),
                   ),
                 ]),
