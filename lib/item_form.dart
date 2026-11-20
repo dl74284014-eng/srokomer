@@ -187,9 +187,31 @@ class _ItemFormPageState extends State<ItemFormPage> {
         return;
       }
     }
+    // Без дубликатов: если такой товар уже есть (тот же штрих-код или то же название) — обновляем его
+    var id = widget.item.id;
+    var createdAt = widget.item.createdAt;
+    final code0 = code.text.replaceAll(' ', '');
+    final name0 = name.text.trim().toLowerCase();
+    for (final o in store.items) {
+      if (o.id == id) continue;
+      final same = (code0.isNotEmpty && o.barcode == code0) || (code0.isEmpty && o.barcode.isEmpty && o.name.trim().toLowerCase() == name0);
+      if (same) {
+        if (!widget.isNew) {
+          // редактирование: убираем второй экземпляр
+          await store.deleteItem(o.id);
+        } else {
+          id = o.id;
+          createdAt = o.createdAt;
+          if (photo.isEmpty) photo = o.photo;
+          if (notes.text.trim().isEmpty && o.notes.isNotEmpty) notes.text = o.notes;
+          _snack(t('updated_existing'));
+        }
+        break;
+      }
+    }
     setState(() => saving = true);
     final it = Item(
-      id: widget.item.id,
+      id: id,
       name: name.text.trim(),
       nameRu: nameRu.text.trim(),
       category: category,
@@ -198,7 +220,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
       notes: notes.text.trim(),
       qty: qty,
       photo: photo,
-      createdAt: widget.item.createdAt,
+      createdAt: createdAt,
     );
     await store.upsertItem(it);
     if (remember && it.barcode.isNotEmpty) {

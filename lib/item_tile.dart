@@ -128,7 +128,6 @@ Future<void> showItemActions(BuildContext context, Item it) async {
           const Divider(height: 1),
           tile('edit', Icons.edit_outlined, t('act_edit')),
           tile('date', Icons.event_outlined, t('act_date')),
-          tile('batch', Icons.add_box_outlined, t('act_batch')),
           if (it.qty > 1) tile('minus', Icons.remove_circle_outline, t('act_minus')),
           tile('move', Icons.drive_file_move_outline, t('act_move')),
           tile('delete', Icons.delete_outline, t('delete'), color: const Color(0xFFD6363B)),
@@ -154,13 +153,6 @@ Future<void> showItemActions(BuildContext context, Item it) async {
         final n = Item.fromJson(it.toJson())..expiry = isoOf(d);
         await store.upsertItem(n);
       }
-    case 'batch':
-      final n = Item.fromJson(it.toJson())
-        ..id = newId()
-        ..expiry = ''
-        ..qty = 1
-        ..createdAt = DateTime.now().millisecondsSinceEpoch;
-      await openItemForm(context, n, isNew: true);
     case 'minus':
       final n = Item.fromJson(it.toJson())..qty = it.qty - 1;
       await store.upsertItem(n);
