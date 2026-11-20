@@ -7,6 +7,12 @@ M=android/app/src/main/AndroidManifest.xml
 if ! grep -q usesCleartextTraffic "$M"; then
   sed -i 's#<application#<application android:usesCleartextTraffic="true"#' "$M"
 fi
+# Уведомления: разрешения и приёмники (перепланирование после перезагрузки)
+if ! grep -q 'ScheduledNotificationReceiver' "$M"; then
+  sed -i 's#</application>#<receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"/>\n        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.MY_PACKAGE_REPLACED"/><action android:name="android.intent.action.QUICKBOOT_POWERON"/><action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/></intent-filter></receiver>\n    </application>#' "$M"
+  sed -i 's#<application#<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application#' "$M"
+fi
+
 if ! grep -q 'android.permission.CAMERA' "$M"; then
   sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.CAMERA"/>\n    <application#' "$M"
 fi
@@ -25,10 +31,12 @@ XML
 # Корейская модель распознавания текста ML Kit
 if [ -f android/app/build.gradle ]; then
   G=android/app/build.gradle
-  grep -q text-recognition-korean "$G" || printf "\ndependencies {\n    implementation 'com.google.mlkit:text-recognition-korean:16.0.1'\n}\n" >> "$G"
+  grep -q text-recognition-korean "$G" || printf "\ndependencies {\n    implementation 'com.google.mlkit:text-recognition-korean:16.0.1'\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\n}\n" >> "$G"
+  grep -q coreLibraryDesugaringEnabled "$G" || sed -i 's/compileOptions {/compileOptions {\n        coreLibraryDesugaringEnabled true/' "$G"
 else
   G=android/app/build.gradle.kts
-  grep -q text-recognition-korean "$G" || printf "\ndependencies {\n    implementation(\"com.google.mlkit:text-recognition-korean:16.0.1\")\n}\n" >> "$G"
+  grep -q text-recognition-korean "$G" || printf "\ndependencies {\n    implementation(\"com.google.mlkit:text-recognition-korean:16.0.1\")\n    coreLibraryDesugaring(\"com.android.tools:desugar_jdk_libs:2.1.4\")\n}\n" >> "$G"
+  grep -q isCoreLibraryDesugaringEnabled "$G" || sed -i 's/compileOptions {/compileOptions {\n        isCoreLibraryDesugaringEnabled = true/' "$G"
 fi
 
 # R8: модели других языков ML Kit не подключаем — не ругаться на их отсутствие
@@ -37,6 +45,10 @@ cat > android/app/proguard-rules.pro <<'PRO'
 -dontwarn com.google.mlkit.vision.text.devanagari.**
 -dontwarn com.google.mlkit.vision.text.japanese.**
 -keep class com.google.mlkit.vision.text.korean.** { *; }
+-keep class com.dexterous.** { *; }
+-keepattributes Signature
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep class * extends com.google.gson.reflect.TypeToken
 PRO
 
 # Плагины (mobile_scanner и др.) требуют Kotlin 2.x

@@ -34,6 +34,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
   final FocusNode nameFocus = FocusNode();
   late String category, expiry, photo;
   late int qty;
+  late bool mute;
   bool remember = true;
   bool catManual = false; // категорию выбрали вручную — больше не трогаем
   bool saving = false;
@@ -51,6 +52,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
     expiry = it.expiry;
     photo = it.photo;
     qty = it.qty;
+    mute = it.mute;
     if (category == 'other' && it.name.isNotEmpty) category = guessCategory(it.name);
     catManual = !widget.isNew;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -219,6 +221,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
       expiry: expiry,
       notes: notes.text.trim(),
       qty: qty,
+      mute: mute,
       photo: photo,
       createdAt: createdAt,
     );
@@ -436,6 +439,13 @@ class _ItemFormPageState extends State<ItemFormPage> {
               hintText: t('notes_hint'),
               border: const OutlineInputBorder(),
             ),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            secondary: const Icon(Icons.notifications_outlined),
+            title: Text(t('notif_item')),
+            value: !mute,
+            onChanged: (v) => setState(() => mute = !v),
           ),
           CheckboxListTile(
             contentPadding: EdgeInsets.zero,

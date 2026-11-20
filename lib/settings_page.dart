@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 import 'l10n.dart';
 import 'lookup.dart';
+import 'models.dart';
+import 'notify.dart';
 import 'store.dart';
 import 'sync.dart';
 
@@ -238,6 +240,105 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Future<void> _set(String k, String v) async {
+    await store.setSetting(k, v);
+    setState(() {});
+    notifier.reschedule();
+  }
+
+  Widget _notifBlock() {
+    final on = notifier.on;
+    final days = notifier.days;
+    final cs = notifier.cats;
+    const dayOptions = [0, 1, 2, 3, 5, 7, 14, 30];
+    final h = notifier.hour.toString().padLeft(2, '0');
+    final m = notifier.minute.toString().padLeft(2, '0');
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('🔔 ${t('notif_title')}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(t('notif_on')),
+            value: on,
+            onChanged: (v) async {
+              if (v) await notifier.requestPermission();
+              await _set('notifOn', v ? '1' : '0');
+            },
+          ),
+          if (on) ...[
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(t('notif_time')),
+              trailing: OutlinedButton(
+                onPressed: () async {
+                  final tm = await showTimePicker(
+                      context: context, initialTime: TimeOfDay(hour: notifier.hour, minute: notifier.minute));
+                  if (tm == null) return;
+                  await store.setSetting('notifHour', '${tm.hour}');
+                  await _set('notifMin', '${tm.minute}');
+                },
+                child: Text('$h:$m', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(t('notif_days'), style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text(t('notif_days_help'), style: const TextStyle(color: Colors.black54, fontSize: 13)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              for (final d in dayOptions)
+                FilterChip(
+                  label: Text(d == 0 ? t('notif_day0') : tf('short_days', {'n': d})),
+                  selected: days.contains(d),
+                  onSelected: (sel) {
+                    final n = {...days};
+                    sel ? n.add(d) : n.remove(d);
+                    _set('notifDays', (n.toList()..sort()).join(','));
+                  },
+                ),
+            ]),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(t('notif_expired')),
+              value: notifier.expiredReminder,
+              onChanged: (v) => _set('notifExpired', v ? '1' : '0'),
+            ),
+            Text(t('notif_cats'), style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              FilterChip(
+                label: Text(t('notif_all_cats')),
+                selected: cs.isEmpty,
+                onSelected: (_) => _set('notifCats', ''),
+              ),
+              for (final c in cats)
+                FilterChip(
+                  label: Text('${c.e} ${catName(c)}'),
+                  selected: cs.contains(c.k),
+                  onSelected: (sel) {
+                    final n = {...cs};
+                    sel ? n.add(c.k) : n.remove(c.k);
+                    _set('notifCats', n.join(','));
+                  },
+                ),
+            ]),
+            const SizedBox(height: 10),
+            Row(children: [
+              FilledButton.tonalIcon(
+                onPressed: () => notifier.showTest(),
+                icon: const Icon(Icons.notifications_active_outlined),
+                label: Text(t('notif_test')),
+              ),
+            ]),
+          ],
+        ]),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -259,6 +360,8 @@ class _SettingsPageState extends State<SettingsPage> {
             },
           ),
           const SizedBox(height: 20),
+          _notifBlock(),
+          const SizedBox(height: 12),
           _syncBlock(),
           const SizedBox(height: 24),
           Text(t('db_title'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),

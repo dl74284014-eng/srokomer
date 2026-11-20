@@ -7,6 +7,7 @@ import 'l10n.dart';
 import 'list_page.dart';
 import 'lookup.dart';
 import 'models.dart';
+import 'notify.dart';
 import 'scanner_page.dart';
 import 'settings_page.dart';
 import 'store.dart';
@@ -18,6 +19,7 @@ Future<void> main() async {
   await store.load();
   syncer.attach();
   runApp(const SrokomerApp());
+  notifier.init();
 }
 
 const brand = Color(0xFF16794C);
@@ -64,6 +66,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     syncer.syncNow();
     syncer.startPeriodic();
+    if (notifier.on) notifier.requestPermission();
   }
 
   @override
@@ -76,6 +79,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      notifier.reschedule(); // пересчитать «осталось N дней»
       syncer.syncNow();
       syncer.startPeriodic();
     } else if (state == AppLifecycleState.paused) {

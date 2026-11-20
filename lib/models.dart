@@ -43,6 +43,7 @@ class Item {
   String photoRemote; // имя фото в облаке (для синхронизации)
   int createdAt;
   int updatedAt;
+  bool mute; // не присылать уведомления об этом товаре
 
   Item({
     required this.id,
@@ -55,6 +56,7 @@ class Item {
     this.qty = 1,
     this.photo = '',
     this.photoRemote = '',
+    this.mute = false,
     int? createdAt,
     int? updatedAt,
   })  : createdAt = createdAt ?? DateTime.now().millisecondsSinceEpoch,
@@ -73,6 +75,7 @@ class Item {
         'photoRemote': photoRemote,
         'createdAt': createdAt,
         'updatedAt': updatedAt,
+        'mute': mute,
       };
 
   factory Item.fromJson(Map<String, dynamic> j) => Item(
@@ -88,6 +91,7 @@ class Item {
         photoRemote: (j['photoRemote'] ?? '').toString(),
         createdAt: (j['createdAt'] is num) ? (j['createdAt'] as num).toInt() : null,
         updatedAt: (j['updatedAt'] is num) ? (j['updatedAt'] as num).toInt() : 0,
+        mute: j['mute'] == true,
       );
 }
 
