@@ -17,6 +17,11 @@ else
   grep -q text-recognition-korean "$G" || printf "\ndependencies {\n    implementation(\"com.google.mlkit:text-recognition-korean:16.0.1\")\n}\n" >> "$G"
 fi
 
+# Плагины (mobile_scanner и др.) требуют Kotlin 2.x
+for S in android/settings.gradle android/settings.gradle.kts; do
+  if [ -f "$S" ]; then sed -i -E 's/(org\.jetbrains\.kotlin\.android"\)? version ")[0-9.]+"/\12.1.0"/' "$S"; fi
+done
+
 echo "----- $M"; cat "$M"
 echo "----- $G"; cat "$G"
 echo "----- settings"; cat android/settings.gradle* || true
