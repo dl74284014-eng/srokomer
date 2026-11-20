@@ -266,23 +266,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ),
         ),
         const SizedBox(height: 18),
-        // ---- категории ----
-        Text(t('categories'), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 10),
-        GridView.count(
-          crossAxisCount: 3,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          childAspectRatio: 0.92,
-          children: [
-            _catTile('📋', t('all_items'), items, () => _open(ListPage(title: t('all_items')))),
-            for (final c in cats)
-              _catTile(c.e, catName(c), items.where((i) => catOf(i.category).k == c.k).toList(),
-                  () => _open(ListPage(cat: c.k, title: '${c.e} ${catName(c)}'))),
-          ],
-        ),
+        // ---- плашки: категории и все товары ----
+        _bigButton('📂', t('categories'), '${cats.where((c) => items.any((i) => catOf(i.category).k == c.k)).length} / ${cats.length}',
+            () => _open(const CategoriesPage())),
+        const SizedBox(height: 8),
+        _bigButton('📋', t('all_items'), '${items.length} ${t('pcs')}', () => _open(ListPage(title: t('all_items')))),
         const SizedBox(height: 20),
         // ---- скоро заканчивается ----
         Text(t('soon_title'), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
@@ -332,6 +320,68 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _bigButton(String emoji, String title, String sub, VoidCallback onTap) => Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Row(children: [
+              Text(emoji, style: const TextStyle(fontSize: 28)),
+              const SizedBox(width: 14),
+              Expanded(child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+              Text(sub, style: const TextStyle(color: Colors.black54, fontSize: 14)),
+              const SizedBox(width: 6),
+              const Icon(Icons.chevron_right, color: Colors.black45),
+            ]),
+          ),
+        ),
+      );
+}
+
+/// Экран со всеми категориями (открывается с главного экрана).
+class CategoriesPage extends StatelessWidget {
+  const CategoriesPage({super.key});
+
+  void _open(BuildContext context, Widget page) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+
+  int? _minDays(Iterable<Item> l) {
+    int? m;
+    for (final i in l) {
+      final d = daysLeft(i.expiry);
+      if (d != null && (m == null || d < m)) m = d;
+    }
+    return m;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(t('categories'))),
+      body: ListenableBuilder(
+        listenable: store,
+        builder: (context, _) {
+          final items = store.items;
+          return GridView.count(
+            padding: const EdgeInsets.all(14),
+            crossAxisCount: 3,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 0.92,
+            children: [
+              for (final c in cats)
+                _catTile(c.e, catName(c), items.where((i) => catOf(i.category).k == c.k).toList(),
+                    () => _open(context, ListPage(cat: c.k, title: '${c.e} ${catName(c)}'))),
+            ],
+          );
+        },
       ),
     );
   }
