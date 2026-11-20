@@ -64,6 +64,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    store.addListener(_onStore); // смена языка и данных — перерисовать весь экран (шапку и кнопки тоже)
     syncer.syncNow();
     syncer.startPeriodic();
     if (notifier.on) notifier.requestPermission();
@@ -72,8 +73,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    store.removeListener(_onStore);
     syncer.stopPeriodic();
     super.dispose();
+  }
+
+  void _onStore() {
+    if (mounted) setState(() {});
   }
 
   @override
