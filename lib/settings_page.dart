@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'l10n.dart';
+import 'gemini.dart';
 import 'lookup.dart';
 import 'models.dart';
 import 'notify.dart';
@@ -19,6 +20,9 @@ class _SettingsPageState extends State<SettingsPage> {
       TextEditingController(text: store.mfdsKey);
   late final TextEditingController kakao =
       TextEditingController(text: store.kakaoKey);
+  late final TextEditingController gem = TextEditingController(text: store.geminiKey);
+  String? gemStatus;
+  bool busyG = false;
   late final TextEditingController supaUrl = TextEditingController(text: store.supaUrl);
   late final TextEditingController supaKey = TextEditingController(text: store.supaKey);
   final TextEditingController joinCode = TextEditingController();
@@ -31,6 +35,7 @@ class _SettingsPageState extends State<SettingsPage> {
     mfds.dispose();
     kakao.dispose();
     supaUrl.dispose();
+    gem.dispose();
     supaKey.dispose();
     joinCode.dispose();
     super.dispose();
@@ -46,6 +51,19 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {
       busyM = false;
       mfdsStatus = err == null ? t('key_ok') : '❌ $err';
+    });
+  }
+
+  Future<void> _checkGemini() async {
+    final k = gem.text.trim();
+    await store.setSetting('geminiKey', k);
+    if (k.isEmpty) return;
+    setState(() => busyG = true);
+    final err = await testGeminiKey(k);
+    if (!mounted) return;
+    setState(() {
+      busyG = false;
+      gemStatus = err == null ? t('key_ok') : '❌ $err';
     });
   }
 
@@ -386,6 +404,16 @@ class _SettingsPageState extends State<SettingsPage> {
             status: kakaoStatus,
             onCheck: _checkKakao,
             settingKey: 'kakaoKey',
+          ),
+          const SizedBox(height: 10),
+          _keyBlock(
+            title: t('gemini_key'),
+            help: t('gemini_help'),
+            ctrl: gem,
+            busy: busyG,
+            status: gemStatus,
+            onCheck: _checkGemini,
+            settingKey: 'geminiKey',
           ),
           const SizedBox(height: 20),
           Text(t('about_data'), style: const TextStyle(color: Colors.black45)),

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'l10n.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'gemini.dart';
 import 'lookup.dart';
 import 'models.dart';
 import 'store.dart';
@@ -96,20 +97,39 @@ class _ItemFormPageState extends State<ItemFormPage> {
   Future<void> _ocrName() async {
     final x = await _shoot();
     if (x == null || !mounted) return;
-    final lines = await withLoading(context, t('reading_text'), () => ocrLines(x.path));
+    // 1) Gemini (точное чтение), 2) запасной вариант — ML Kit на телефоне
+    final g = await withLoading(context, t('reading_text'), () => geminiRead(x.path));
     if (!mounted) return;
-    final c = nameCandidates(lines);
-    if (c.isEmpty) {
-      _snack(t('no_text'));
-      return;
-    }
     String? chosen;
-    final ans = await askThisOne(context, title: t('is_name_q'), text: c.first, imagePath: x.path);
-    if (!mounted) return;
-    if (ans == true) {
-      chosen = c.first;
-    } else if (ans == false) {
-      chosen = await pickLines(context, c);
+    String gCat = 'other';
+    if (g != null && g.names.isNotEmpty) {
+      gCat = g.category;
+      final ans = await askThisOne(context, title: t('is_name_q'), text: g.names.first, imagePath: x.path);
+      if (!mounted) return;
+      if (ans == true) {
+        chosen = g.names.first;
+      } else if (ans == false && g.names.length > 1) {
+        chosen = await pickOne(context, t('pick_variant'), g.names.skip(1).toList());
+      }
+      if (chosen != null && expiry.isEmpty && g.expiry.isNotEmpty) {
+        setState(() => expiry = g.expiry);
+        _snack('${t('valid_until')}: ${fmtDate(g.expiry)} ✓');
+      }
+    } else {
+      final lines = await withLoading(context, t('reading_text'), () => ocrLines(x.path));
+      if (!mounted) return;
+      final c = nameCandidates(lines);
+      if (c.isEmpty) {
+        _snack(t('no_text'));
+        return;
+      }
+      final ans = await askThisOne(context, title: t('is_name_q'), text: c.first, imagePath: x.path);
+      if (!mounted) return;
+      if (ans == true) {
+        chosen = c.first;
+      } else if (ans == false) {
+        chosen = await pickLines(context, c);
+      }
     }
     if (chosen == null || chosen.isEmpty || !mounted) {
       nameFocus.requestFocus();
@@ -121,8 +141,8 @@ class _ItemFormPageState extends State<ItemFormPage> {
     setState(() {
       name.text = picked;
       if (!catManual) {
-        final g = guessCategory(picked);
-        if (g != 'other') category = g;
+        final gc = gCat != 'other' ? gCat : guessCategory(picked);
+        if (gc != 'other') category = gc;
       }
       photo = saved;
     });
@@ -132,9 +152,16 @@ class _ItemFormPageState extends State<ItemFormPage> {
   Future<void> _ocrDate() async {
     final x = await _shoot();
     if (x == null || !mounted) return;
-    final lines = await withLoading(context, t('finding_date'), () => ocrLines(x.path));
+    FoundDate? f;
+    final g = await withLoading(context, t('finding_date'), () => geminiRead(x.path));
     if (!mounted) return;
-    final f = findExpiry(lines);
+    if (g != null && g.expiry.isNotEmpty) {
+      f = FoundDate(g.expiry, g.rawDate.isNotEmpty ? g.rawDate : fmtDate(g.expiry));
+    } else {
+      final lines = await withLoading(context, t('finding_date'), () => ocrLines(x.path));
+      if (!mounted) return;
+      f = findExpiry(lines);
+    }
     if (f == null) {
       _snack(t('no_date_found'));
       return;

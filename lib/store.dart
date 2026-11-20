@@ -139,6 +139,12 @@ class Store extends ChangeNotifier {
     return k.isNotEmpty ? k : _defaultKakaoKey;
   }
 
+  static const _defaultGeminiKey = '';
+  String get geminiKey {
+    final k = settings['geminiKey'] ?? '';
+    return (k.isNotEmpty ? k : _defaultGeminiKey).trim();
+  }
+
   // Облако синхронизации (Supabase). Значения по умолчанию встраиваются в сборку.
   static const _defaultSupaUrl = '';
   static const _defaultSupaKey = '';
