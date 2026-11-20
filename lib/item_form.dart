@@ -166,6 +166,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
       _snack(t('no_date_found'));
       return;
     }
+    final FoundDate found = f;
     final ok = await askThisOne(
       context,
       title: t('date_ok_q'),
@@ -173,7 +174,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
       sub: '${t('on_pack')}: ${f.raw} · ${leftText(daysLeft(f.iso))}',
       imagePath: x.path,
     );
-    if (ok == true) setState(() => expiry = f.iso);
+    if (ok == true) setState(() => expiry = found.iso);
   }
 
   Future<void> _pickDate() async {
