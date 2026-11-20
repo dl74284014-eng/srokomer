@@ -139,7 +139,7 @@ class Store extends ChangeNotifier {
     return k.isNotEmpty ? k : _defaultKakaoKey;
   }
 
-  static const _defaultGeminiKey = '';
+  static const _defaultGeminiKey = 'AQ.Ab8RN6JO9RVactXmOcY1qS2Zjfoj8FquD6lcrioYnwYyb489zw';
   String get geminiKey {
     final k = settings['geminiKey'] ?? '';
     return (k.isNotEmpty ? k : _defaultGeminiKey).trim();
