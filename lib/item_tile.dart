@@ -18,7 +18,6 @@ Future<void> openItemForm(BuildContext context, Item it,
 }
 
 Widget itemThumb(Item it, {double size = 58}) {
-  final c = catOf(it.category);
   final hasPhoto = it.photo.isNotEmpty && File(it.photo).existsSync();
   return ClipRRect(
     borderRadius: BorderRadius.circular(12),
@@ -29,7 +28,7 @@ Widget itemThumb(Item it, {double size = 58}) {
       alignment: Alignment.center,
       child: hasPhoto
           ? Image.file(File(it.photo), width: size, height: size, fit: BoxFit.cover, cacheWidth: 200)
-          : Text(c.e, style: TextStyle(fontSize: size * 0.45)),
+          : Text('📦', style: TextStyle(fontSize: size * 0.45)),
     ),
   );
 }
@@ -129,7 +128,6 @@ Future<void> showItemActions(BuildContext context, Item it) async {
           tile('edit', Icons.edit_outlined, t('act_edit')),
           tile('date', Icons.event_outlined, t('act_date')),
           if (it.qty > 1) tile('minus', Icons.remove_circle_outline, t('act_minus')),
-          tile('move', Icons.drive_file_move_outline, t('act_move')),
           tile('delete', Icons.delete_outline, t('delete'), color: const Color(0xFFD6363B)),
           const SizedBox(height: 8),
         ]),
@@ -156,26 +154,6 @@ Future<void> showItemActions(BuildContext context, Item it) async {
     case 'minus':
       final n = Item.fromJson(it.toJson())..qty = it.qty - 1;
       await store.upsertItem(n);
-    case 'move':
-      final k = await showModalBottomSheet<String>(
-        context: context,
-        isScrollControlled: true,
-        builder: (ctx) => SafeArea(
-          child: ListView(shrinkWrap: true, children: [
-            for (final c in cats)
-              ListTile(
-                leading: Text(c.e, style: const TextStyle(fontSize: 24)),
-                title: Text(catName(c)),
-                trailing: c.k == it.category ? const Icon(Icons.check) : null,
-                onTap: () => Navigator.pop(ctx, c.k),
-              ),
-          ]),
-        ),
-      );
-      if (k != null) {
-        final n = Item.fromJson(it.toJson())..category = k;
-        await store.upsertItem(n);
-      }
     case 'delete':
       final ok = await showDialog<bool>(
         context: context,

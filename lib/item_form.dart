@@ -286,7 +286,6 @@ class _ItemFormPageState extends State<ItemFormPage> {
   @override
   Widget build(BuildContext context) {
     final dl = daysLeft(expiry);
-    final c = catOf(category);
     final same = code.text.isEmpty
         ? <Item>[]
         : store.items.where((i) => i.barcode == code.text && i.id != widget.item.id).toList();
@@ -312,7 +311,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
               color: const Color(0xFFE9E5DC),
               child: photo.isNotEmpty && File(photo).existsSync()
                   ? Image.file(File(photo), fit: BoxFit.contain)
-                  : Center(child: Text(c.e, style: const TextStyle(fontSize: 56))),
+                  : const Center(child: Text('📦', style: TextStyle(fontSize: 56))),
             ),
           ),
           const SizedBox(height: 8),
@@ -413,22 +412,6 @@ class _ItemFormPageState extends State<ItemFormPage> {
               child: Text(leftText(dl),
                   style: TextStyle(color: urgColor(urgency(dl)), fontWeight: FontWeight.w700)),
             ),
-          gap,
-          // категория
-          DropdownButtonFormField<String>(
-            key: ValueKey(category),
-            value: category,
-            isExpanded: true,
-            decoration: InputDecoration(labelText: t('category'), border: const OutlineInputBorder()),
-            items: [
-              for (final x in cats)
-                DropdownMenuItem(value: x.k, child: Text('${x.e}  ${catName(x)}')),
-            ],
-            onChanged: (v) => setState(() {
-              category = v ?? 'other';
-              catManual = true;
-            }),
-          ),
           gap,
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Container(

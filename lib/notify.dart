@@ -28,8 +28,7 @@ class Notifier {
   bool get expiredReminder => (store.settings['notifExpired'] ?? '1') == '1';
 
   /// Пусто — все категории.
-  Set<String> get cats =>
-      (store.settings['notifCats'] ?? '').split(',').where((e) => e.isNotEmpty).toSet();
+  Set<String> get cats => const {}; // категории убраны — уведомления по всем товарам
 
   Future<void> init() async {
     try {

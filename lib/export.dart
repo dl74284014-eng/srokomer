@@ -12,18 +12,12 @@ import 'models.dart';
 import 'store.dart';
 
 List<Item> _sortedItems() {
-  final order = {for (var i = 0; i < cats.length; i++) cats[i].k: i};
   final l = [...store.items];
-  l.sort((a, b) {
-    final c = (order[catOf(a.category).k] ?? 99).compareTo(order[catOf(b.category).k] ?? 99);
-    if (c != 0) return c;
-    return (daysLeft(a.expiry) ?? 1 << 30).compareTo(daysLeft(b.expiry) ?? 1 << 30);
-  });
+  l.sort((a, b) => (daysLeft(a.expiry) ?? 1 << 30).compareTo(daysLeft(b.expiry) ?? 1 << 30));
   return l;
 }
 
 List<String> _headers() => [
-      t('col_cat'),
       t('name'),
       t('translation').split('(').first.trim(),
       t('barcode'),
@@ -38,7 +32,6 @@ List<String> _row(Item it) {
   final dl = daysLeft(it.expiry);
   final added = DateTime.fromMillisecondsSinceEpoch(it.createdAt);
   return [
-    catName(catOf(it.category)),
     it.name,
     it.nameRu,
     it.barcode,
@@ -71,15 +64,15 @@ Future<File> buildXlsx() async {
     final dl = daysLeft(it.expiry);
     sh.appendRow([
       for (var i = 0; i < r.length; i++)
-        if (i == 4)
+        if (i == 3)
           xl.IntCellValue(it.qty)
-        else if (i == 6 && dl != null)
+        else if (i == 5 && dl != null)
           xl.IntCellValue(dl)
         else
           xl.TextCellValue(r[i]),
     ]);
   }
-  const widths = [18.0, 36.0, 24.0, 16.0, 7.0, 13.0, 12.0, 30.0, 13.0];
+  const widths = [36.0, 24.0, 16.0, 7.0, 13.0, 12.0, 30.0, 13.0];
   for (var i = 0; i < widths.length; i++) {
     sh.setColumnWidth(i, widths[i]);
   }

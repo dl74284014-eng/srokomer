@@ -267,7 +267,6 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _notifBlock() {
     final on = notifier.on;
     final days = notifier.days;
-    final cs = notifier.cats;
     const dayOptions = [0, 1, 2, 3, 5, 7, 14, 30];
     final h = notifier.hour.toString().padLeft(2, '0');
     final m = notifier.minute.toString().padLeft(2, '0');
@@ -324,25 +323,6 @@ class _SettingsPageState extends State<SettingsPage> {
               value: notifier.expiredReminder,
               onChanged: (v) => _set('notifExpired', v ? '1' : '0'),
             ),
-            Text(t('notif_cats'), style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            Wrap(spacing: 6, runSpacing: 6, children: [
-              FilterChip(
-                label: Text(t('notif_all_cats')),
-                selected: cs.isEmpty,
-                onSelected: (_) => _set('notifCats', ''),
-              ),
-              for (final c in cats)
-                FilterChip(
-                  label: Text('${c.e} ${catName(c)}'),
-                  selected: cs.contains(c.k),
-                  onSelected: (sel) {
-                    final n = {...cs};
-                    sel ? n.add(c.k) : n.remove(c.k);
-                    _set('notifCats', n.join(','));
-                  },
-                ),
-            ]),
             const SizedBox(height: 10),
             Row(children: [
               FilledButton.tonalIcon(

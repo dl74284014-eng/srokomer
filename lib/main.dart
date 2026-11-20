@@ -291,9 +291,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ),
         const SizedBox(height: 18),
         // ---- плашки: категории и все товары ----
-        _bigButton('📂', t('categories'), '${cats.where((c) => items.any((i) => catOf(i.category).k == c.k)).length} / ${cats.length}',
-            () => _open(const CategoriesPage())),
-        const SizedBox(height: 8),
         _bigButton('📋', t('all_items'), '${items.length} ${t('pcs')}', () => _open(ListPage(title: t('all_items')))),
         const SizedBox(height: 20),
         // ---- скоро заканчивается ----
