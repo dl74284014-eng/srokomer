@@ -10,16 +10,16 @@ fi
 if ! grep -q 'android.permission.CAMERA' "$M"; then
   sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.CAMERA"/>\n    <application#' "$M"
 fi
-# Название под значком: на русском телефоне — «Срок годности», на корейском — «유통기한»
+# Название под значком
 sed -i 's#android:label="[^"]*"#android:label="@string/app_name"#' "$M"
 mkdir -p android/app/src/main/res/values android/app/src/main/res/values-ko
 cat > android/app/src/main/res/values/strings.xml <<'XML'
 <?xml version="1.0" encoding="utf-8"?>
-<resources><string name="app_name">Срок годности</string></resources>
+<resources><string name="app_name">L할인마트 유통기한</string></resources>
 XML
 cat > android/app/src/main/res/values-ko/strings.xml <<'XML'
 <?xml version="1.0" encoding="utf-8"?>
-<resources><string name="app_name">유통기한</string></resources>
+<resources><string name="app_name">L할인마트 유통기한</string></resources>
 XML
 
 # Корейская модель распознавания текста ML Kit

@@ -30,7 +30,7 @@ class SrokomerApp extends StatelessWidget {
     return ListenableBuilder(
       listenable: store,
       builder: (context, _) => MaterialApp(
-        title: isKo ? '유통기한' : 'Срок годности',
+        title: 'L할인마트 유통기한',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
@@ -176,7 +176,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             child: Image.asset('assets/icon.png', width: 36, height: 36),
           ),
           const SizedBox(width: 10),
-          Text(isKo ? '유통기한' : 'Срок годности', style: const TextStyle(fontWeight: FontWeight.w800)),
+          const Text('L할인마트 유통기한', style: TextStyle(fontWeight: FontWeight.w800)),
         ]),
         actions: [
           ListenableBuilder(
