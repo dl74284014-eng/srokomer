@@ -94,7 +94,7 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     final mfdsKey = store.mfdsKey;
-    final kakaoKey = store.settings['kakaoKey'] ?? '';
+    final kakaoKey = store.kakaoKey;
     final found = await withLoading(context, tf('searching', {'code': code}), () async {
       final r = await lookupBarcode(code, mfdsKey: mfdsKey, kakaoKey: kakaoKey);
       var photo = '';

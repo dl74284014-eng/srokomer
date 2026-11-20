@@ -14,7 +14,7 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController mfds =
       TextEditingController(text: store.mfdsKey);
   late final TextEditingController kakao =
-      TextEditingController(text: store.settings['kakaoKey'] ?? '');
+      TextEditingController(text: store.kakaoKey);
   String? mfdsStatus, kakaoStatus;
   bool busyM = false, busyK = false;
 
