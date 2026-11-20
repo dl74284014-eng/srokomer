@@ -35,6 +35,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
   late String category, expiry, photo;
   late int qty;
   bool remember = true;
+  bool catManual = false; // категорию выбрали вручную — больше не трогаем
   bool saving = false;
   final picker = ImagePicker();
 
@@ -50,6 +51,8 @@ class _ItemFormPageState extends State<ItemFormPage> {
     expiry = it.expiry;
     photo = it.photo;
     qty = it.qty;
+    if (category == 'other' && it.name.isNotEmpty) category = guessCategory(it.name);
+    catManual = !widget.isNew;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.autoOcr) {
         _ocrName();
@@ -115,7 +118,10 @@ class _ItemFormPageState extends State<ItemFormPage> {
     if (!mounted) return;
     setState(() {
       name.text = picked;
-      if (category == 'other') category = guessCategory(picked);
+      if (!catManual) {
+        final g = guessCategory(picked);
+        if (g != 'other') category = g;
+      }
       photo = saved;
     });
   }
@@ -281,6 +287,11 @@ class _ItemFormPageState extends State<ItemFormPage> {
               child: TextField(
                 controller: name,
                 focusNode: nameFocus,
+                onChanged: (v) {
+                  if (catManual) return;
+                  final g = guessCategory(v);
+                  if (g != category && g != 'other') setState(() => category = g);
+                },
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
                   labelText: t('name'),
@@ -352,6 +363,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
           gap,
           // категория
           DropdownButtonFormField<String>(
+            key: ValueKey(category),
             value: category,
             isExpanded: true,
             decoration: InputDecoration(labelText: t('category'), border: const OutlineInputBorder()),
@@ -359,7 +371,10 @@ class _ItemFormPageState extends State<ItemFormPage> {
               for (final x in cats)
                 DropdownMenuItem(value: x.k, child: Text('${x.e}  ${catName(x)}')),
             ],
-            onChanged: (v) => setState(() => category = v ?? 'other'),
+            onChanged: (v) => setState(() {
+              category = v ?? 'other';
+              catManual = true;
+            }),
           ),
           gap,
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [

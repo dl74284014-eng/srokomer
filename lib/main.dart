@@ -10,11 +10,13 @@ import 'models.dart';
 import 'scanner_page.dart';
 import 'settings_page.dart';
 import 'store.dart';
+import 'sync.dart';
 import 'widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await store.load();
+  syncer.attach();
   runApp(const SrokomerApp());
 }
 
@@ -55,7 +57,31 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    syncer.syncNow();
+    syncer.startPeriodic();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    syncer.stopPeriodic();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      syncer.syncNow();
+      syncer.startPeriodic();
+    } else if (state == AppLifecycleState.paused) {
+      syncer.stopPeriodic();
+    }
+  }
   Future<void> _scan() async {
     final code = await Navigator.push<String>(
         context, MaterialPageRoute(builder: (_) => const ScannerPage()));
@@ -139,6 +165,17 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: Text(isKo ? '🛒 유통기한 체크' : '🛒 Срокомер', style: const TextStyle(fontWeight: FontWeight.w800)),
         actions: [
+          ListenableBuilder(
+            listenable: syncer,
+            builder: (context, _) {
+              if (!syncer.enabled) return const SizedBox.shrink();
+              final icon = syncer.running
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5))
+                  : Icon(syncer.error == null ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
+                      color: syncer.error == null ? const Color(0xFF2A8A57) : const Color(0xFFD6363B));
+              return IconButton(tooltip: t('sync_now'), icon: icon, onPressed: syncer.syncNow);
+            },
+          ),
           IconButton(
             tooltip: t('export'),
             icon: const Icon(Icons.ios_share),
@@ -151,7 +188,10 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: ListenableBuilder(listenable: store, builder: (context, _) => _body()),
+      body: RefreshIndicator(
+        onRefresh: syncer.syncNow,
+        child: ListenableBuilder(listenable: store, builder: (context, _) => _body()),
+      ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
@@ -202,6 +242,7 @@ class _HomePageState extends State<HomePage> {
       ..sort((a, b) => daysLeft(a.expiry)!.compareTo(daysLeft(b.expiry)!));
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 20),
       children: [
         // ---- светофор сроков ----

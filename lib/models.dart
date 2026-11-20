@@ -39,8 +39,10 @@ class Item {
   String expiry; // YYYY-MM-DD или ''
   String notes;
   int qty;
-  String photo; // путь к файлу
+  String photo; // путь к файлу на этом телефоне
+  String photoRemote; // имя фото в облаке (для синхронизации)
   int createdAt;
+  int updatedAt;
 
   Item({
     required this.id,
@@ -52,8 +54,11 @@ class Item {
     this.notes = '',
     this.qty = 1,
     this.photo = '',
+    this.photoRemote = '',
     int? createdAt,
-  }) : createdAt = createdAt ?? DateTime.now().millisecondsSinceEpoch;
+    int? updatedAt,
+  })  : createdAt = createdAt ?? DateTime.now().millisecondsSinceEpoch,
+        updatedAt = updatedAt ?? 0;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -65,7 +70,9 @@ class Item {
         'notes': notes,
         'qty': qty,
         'photo': photo,
+        'photoRemote': photoRemote,
         'createdAt': createdAt,
+        'updatedAt': updatedAt,
       };
 
   factory Item.fromJson(Map<String, dynamic> j) => Item(
@@ -76,22 +83,39 @@ class Item {
         barcode: (j['barcode'] ?? '').toString(),
         expiry: (j['expiry'] ?? '').toString(),
         notes: (j['notes'] ?? '').toString(),
-        qty: (j['qty'] is int) ? j['qty'] as int : 1,
+        qty: (j['qty'] is num) ? (j['qty'] as num).toInt() : 1,
         photo: (j['photo'] ?? '').toString(),
-        createdAt: (j['createdAt'] is int) ? j['createdAt'] as int : null,
+        photoRemote: (j['photoRemote'] ?? '').toString(),
+        createdAt: (j['createdAt'] is num) ? (j['createdAt'] as num).toInt() : null,
+        updatedAt: (j['updatedAt'] is num) ? (j['updatedAt'] as num).toInt() : 0,
       );
 }
 
 class Product {
-  String name, nameRu, category, photo;
-  Product({this.name = '', this.nameRu = '', this.category = 'other', this.photo = ''});
-  Map<String, dynamic> toJson() =>
-      {'name': name, 'nameRu': nameRu, 'category': category, 'photo': photo};
+  String name, nameRu, category, photo, photoRemote;
+  int updatedAt;
+  Product(
+      {this.name = '',
+      this.nameRu = '',
+      this.category = 'other',
+      this.photo = '',
+      this.photoRemote = '',
+      this.updatedAt = 0});
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'nameRu': nameRu,
+        'category': category,
+        'photo': photo,
+        'photoRemote': photoRemote,
+        'updatedAt': updatedAt,
+      };
   factory Product.fromJson(Map<String, dynamic> j) => Product(
         name: (j['name'] ?? '').toString(),
         nameRu: (j['nameRu'] ?? '').toString(),
         category: (j['category'] ?? 'other').toString(),
         photo: (j['photo'] ?? '').toString(),
+        photoRemote: (j['photoRemote'] ?? '').toString(),
+        updatedAt: (j['updatedAt'] is num) ? (j['updatedAt'] as num).toInt() : 0,
       );
 }
 
@@ -175,20 +199,20 @@ Color urgSoft(Urg u) {
 
 // ---------- угадывание категории по названию ----------
 const _catWords = <String, List<String>>{
-  'kimchi': ['김치', '반찬', '깍두기', '단무지', '장아찌', '젓갈', 'kimchi'],
-  'tofu': ['두부', '계란', '달걀', '메추리', 'egg', 'tofu'],
-  'noodle': ['면류', '라면', '우동', '국수', '짜파게티', '냉면', '쫄면', '소바', '파스타', 'noodle', 'ramen', 'pasta'],
-  'frozen': ['냉동', '아이스', '만두', 'frozen', 'ice cream', 'ice-cream'],
-  'milk': ['발효유', '유가공', '우유', '요거트', '요구르트', '치즈', '버터', '생크림', '유제품', 'milk', 'yogurt', 'cheese', 'dairies', 'butter'],
-  'meat': ['식육', '돼지', '소고기', '한우', '닭', '삼겹', '목살', '햄', '소시지', '베이컨', '육포', 'meat', 'sausage', 'ham', 'bacon', 'chicken'],
-  'fish': ['생선', '고등어', '연어', '새우', '오징어', '어묵', '수산', '맛살', '멸치', '꽃게', '조개', 'fish', 'seafood', 'shrimp'],
-  'sauce': ['장류', '조미', '소스', '고추장', '된장', '간장', '케첩', '마요', '양념', '식초', '쌈장', '드레싱', 'sauce', 'condiment', 'ketchup'],
-  'snack': ['과자류', '캔디', '과자', '초콜릿', '초코', '사탕', '젤리', '쿠키', '스낵', '칩', '비스킷', '껌', 'snack', 'chocolate', 'candy', 'biscuit', 'cookie', 'chips'],
-  'bread': ['빵류', '빵', '식빵', '케이크', '베이커리', '베이글', '머핀', 'bread', 'cake', 'bakery'],
-  'ready': ['즉석', '간편조리', '도시락', '김밥', '삼각', '즉석', '컵밥', '샌드위치', '밀키트', 'meal', 'sandwich'],
-  'veg': ['사과', '배추', '양파', '감자', '바나나', '채소', '야채', '과일', '샐러드', '버섯', '토마토', 'fruit', 'vegetable', 'salad'],
-  'drink': ['음료류', '다류', '음료', '주스', '콜라', '사이다', '커피', '녹차', '홍차', '생수', '맥주', '소주', '막걸리', '탄산', '이온', '우롱', 'juice', 'drink', 'beverage', 'water', 'coffee', 'tea', 'soda', 'beer'],
-  'grocery': ['쌀', '밀가루', '설탕', '소금', '식용유', '참기름', '통조림', '참치', '햇반', '시리얼', 'flour', 'oil', 'canned', 'rice', 'cereal'],
+  'kimchi': ['포기김치', '열무', '오이소박이', '나물', '무침', '조림', '볶음', '절임', '피클', '김치', '반찬', '깍두기', '단무지', '장아찌', '젓갈', 'kimchi'],
+  'tofu': ['유부', '순두부', '구운란', '훈제란', '난류', '두부', '계란', '달걀', '메추리', 'egg', 'tofu'],
+  'noodle': ['라볶이', '칼국수', '당면', '스파게티', '짬뽕', '비빔면', '컵라면', '사리', '면류', '라면', '우동', '국수', '짜파게티', '냉면', '쫄면', '소바', '파스타', 'noodle', 'ramen', 'pasta'],
+  'frozen': ['아이스크림', '빙과', '돈까스', '너겟', '튀김', '냉동피자', '냉동', '아이스', '만두', 'frozen', 'ice cream', 'ice-cream'],
+  'milk': ['두유', '라떼', '요플레', '크림치즈', '연유', '가공유', '발효유', '유가공', '우유', '요거트', '요구르트', '치즈', '버터', '생크림', '유제품', 'milk', 'yogurt', 'cheese', 'dairies', 'butter'],
+  'meat': ['소불고기', '불고기', '갈비', '족발', '편육', '닭가슴살', '스팸', '런천미트', '미트볼', '식육', '돼지', '소고기', '한우', '닭', '삼겹', '목살', '햄', '소시지', '베이컨', '육포', 'meat', 'sausage', 'ham', 'bacon', 'chicken'],
+  'fish': ['김 ', '조미김', '미역', '다시마', '굴', '전복', '홍합', '낙지', '쭈꾸미', '명태', '황태', '갈치', '꽁치', '참치회', '수산물', '생선', '고등어', '연어', '새우', '오징어', '어묵', '수산', '맛살', '멸치', '꽃게', '조개', 'fish', 'seafood', 'shrimp'],
+  'sauce': ['카레', '짜장', '드레싱', '와사비', '머스타드', '물엿', '올리고당', '맛술', '액젓', '육수', '다시다', '스톡', '장류', '조미', '소스', '고추장', '된장', '간장', '케첩', '마요', '양념', '식초', '쌈장', '드레싱', 'sauce', 'condiment', 'ketchup'],
+  'snack': ['빼빼로', '초코파이', '새우깡', '포카칩', '감자칩', '팝콘', '아몬드', '견과', '양갱', '약과', '사탕', '마이쮸', '디저트', '과자류', '캔디', '과자', '초콜릿', '초코', '사탕', '젤리', '쿠키', '스낵', '칩', '비스킷', '껌', 'snack', 'chocolate', 'candy', 'biscuit', 'cookie', 'chips'],
+  'bread': ['크로와상', '모닝빵', '단팥빵', '카스테라', '롤케이크', '도넛', '와플', '빵류', '빵', '식빵', '케이크', '베이커리', '베이글', '머핀', 'bread', 'cake', 'bakery'],
+  'ready': ['핫바', '컵반', '죽', '국밥', '찌개', '곰탕', '삼계탕', '갈비탕', '볶음밥', '주먹밥', '햄버거', '피자', '떡볶이', '순대', '어묵탕', '즉석', '간편조리', '도시락', '김밥', '삼각', '즉석', '컵밥', '샌드위치', '밀키트', 'meal', 'sandwich'],
+  'veg': ['딸기', '포도', '귤', '오렌지', '키위', '수박', '참외', '복숭아', '고구마', '당근', '오이', '호박', '상추', '깻잎', '파', '마늘', '고추', '콩나물', '숙주', '사과', '배추', '양파', '감자', '바나나', '채소', '야채', '과일', '샐러드', '버섯', '토마토', 'fruit', 'vegetable', 'salad'],
+  'drink': ['에이드', '스무디', '두유음료', '식혜', '수정과', '꿀물', '탄산수', '음료수', '와인', '하이볼', '음료류', '다류', '음료', '주스', '콜라', '사이다', '커피', '녹차', '홍차', '생수', '맥주', '소주', '막걸리', '탄산', '이온', '우롱', 'juice', 'drink', 'beverage', 'water', 'coffee', 'tea', 'soda', 'beer'],
+  'grocery': ['라면사리', '부침가루', '튀김가루', '전분', '깨', '후추', '김가루', '누룽지', '잡곡', '현미', '오트밀', '꿀', '잼', '쌀', '밀가루', '설탕', '소금', '식용유', '참기름', '통조림', '참치', '햇반', '시리얼', 'flour', 'oil', 'canned', 'rice', 'cereal'],
 };
 
 String guessCategory(String text) {
