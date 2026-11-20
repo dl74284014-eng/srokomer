@@ -63,6 +63,12 @@ class Store extends ChangeNotifier {
     await _save();
   }
 
+  static const _defaultMfdsKey = '30bc43ac294d4eabbc4f';
+  String get mfdsKey {
+    final k = settings['mfdsKey'] ?? '';
+    return k.isNotEmpty ? k : _defaultMfdsKey;
+  }
+
   Future<void> setSetting(String k, String v) async {
     settings[k] = v;
     if (k == 'lang') notifyListeners();

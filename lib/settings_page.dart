@@ -12,7 +12,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController mfds =
-      TextEditingController(text: store.settings['mfdsKey'] ?? '');
+      TextEditingController(text: store.mfdsKey);
   late final TextEditingController kakao =
       TextEditingController(text: store.settings['kakaoKey'] ?? '');
   String? mfdsStatus, kakaoStatus;
