@@ -10,7 +10,17 @@ fi
 if ! grep -q 'android.permission.CAMERA' "$M"; then
   sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.CAMERA"/>\n    <application#' "$M"
 fi
-sed -i 's#android:label="srokomer"#android:label="Срокомер"#' "$M"
+# Название под значком: на русском телефоне — «Срок годности», на корейском — «유통기한»
+sed -i 's#android:label="[^"]*"#android:label="@string/app_name"#' "$M"
+mkdir -p android/app/src/main/res/values android/app/src/main/res/values-ko
+cat > android/app/src/main/res/values/strings.xml <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<resources><string name="app_name">Срок годности</string></resources>
+XML
+cat > android/app/src/main/res/values-ko/strings.xml <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<resources><string name="app_name">유통기한</string></resources>
+XML
 
 # Корейская модель распознавания текста ML Kit
 if [ -f android/app/build.gradle ]; then

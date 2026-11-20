@@ -33,7 +33,7 @@ String leftText(int? dl) {
 }
 
 const _ru = <String, String>{
-  'app': 'Срокомер',
+  'app': 'Срок годности',
   'expired': 'просрочено',
   'le3': '≤ 3 дней',
   'le7': '≤ 7 дней',
@@ -160,7 +160,7 @@ const _ru = <String, String>{
   'export_title': 'Выгрузить список',
   'export_sub': 'Файл можно сохранить, отправить в KakaoTalk, на почту и т. д.',
   'export_empty': 'Список пуст — нечего выгружать',
-  'export_doc_title': 'Срокомер — список товаров',
+  'export_doc_title': 'Срок годности — список товаров',
   'act_edit': 'Редактировать',
   'act_date': 'Изменить срок годности',
   'act_batch': 'Добавить ещё партию (другой срок)',
@@ -180,7 +180,7 @@ const _ru = <String, String>{
 };
 
 const _ko = <String, String>{
-  'app': '유통기한 체크',
+  'app': '유통기한',
   'expired': '기한 지남',
   'le3': '3일 이내',
   'le7': '7일 이내',
@@ -304,7 +304,7 @@ const _ko = <String, String>{
   'export_title': '목록 내보내기',
   'export_sub': '파일을 저장하거나 카카오톡, 메일 등으로 보낼 수 있습니다.',
   'export_empty': '목록이 비어 있습니다',
-  'export_doc_title': '유통기한 체크 — 상품 목록',
+  'export_doc_title': '유통기한 — 상품 목록',
   'act_edit': '수정',
   'act_date': '유통기한 변경',
   'act_batch': '같은 상품 추가 (다른 기한)',
