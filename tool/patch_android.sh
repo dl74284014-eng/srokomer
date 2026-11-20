@@ -17,6 +17,14 @@ else
   grep -q text-recognition-korean "$G" || printf "\ndependencies {\n    implementation(\"com.google.mlkit:text-recognition-korean:16.0.1\")\n}\n" >> "$G"
 fi
 
+# R8: модели других языков ML Kit не подключаем — не ругаться на их отсутствие
+cat > android/app/proguard-rules.pro <<'PRO'
+-dontwarn com.google.mlkit.vision.text.chinese.**
+-dontwarn com.google.mlkit.vision.text.devanagari.**
+-dontwarn com.google.mlkit.vision.text.japanese.**
+-keep class com.google.mlkit.vision.text.korean.** { *; }
+PRO
+
 # Плагины (mobile_scanner и др.) требуют Kotlin 2.x
 for S in android/settings.gradle android/settings.gradle.kts; do
   if [ -f "$S" ]; then sed -i -E 's/(org\.jetbrains\.kotlin\.android"\)? version ")1\.[0-9.]+"/\12.1.0"/' "$S"; fi
