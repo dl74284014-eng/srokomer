@@ -176,6 +176,7 @@ class SyncService extends ChangeNotifier {
   // ---------------- получение ----------------
   final Set<String> _needPhotos = {};
   final Set<String> _needProductPhotos = {};
+  final Set<String> _triedPhotos = {}; // уже пробовали скачать в этот запуск — не повторяем каждые 4 с
   bool _downloading = false;
 
   String _existingLocal(String remote) {
@@ -195,7 +196,12 @@ class SyncService extends ChangeNotifier {
           _needPhotos.remove(id);
           continue;
         }
-        final path = await _localPhotoFor(store.items[i].photoRemote);
+        final rem = store.items[i].photoRemote;
+        if (!_triedPhotos.add(rem)) {
+          _needPhotos.remove(id);
+          continue;
+        }
+        final path = await _localPhotoFor(rem);
         if (path.isNotEmpty) {
           final j = store.items.indexWhere((e) => e.id == id);
           if (j >= 0) store.items[j].photo = path;
@@ -206,6 +212,10 @@ class SyncService extends ChangeNotifier {
       for (final code in _needProductPhotos.toList()) {
         final p = store.products[code];
         if (p == null) {
+          _needProductPhotos.remove(code);
+          continue;
+        }
+        if (!_triedPhotos.add(p.photoRemote)) {
           _needProductPhotos.remove(code);
           continue;
         }
@@ -241,7 +251,7 @@ class SyncService extends ChangeNotifier {
     final path = '${store.photoDir.path}/$name';
     if (await File(path).exists()) return path;
     try {
-      final r = await http.get(_obj(remote), headers: _h).timeout(const Duration(seconds: 30));
+      final r = await http.get(_obj(remote), headers: _h).timeout(const Duration(seconds: 12));
       if (r.statusCode == 200 && r.bodyBytes.isNotEmpty) {
         return store.savePhotoBytes(r.bodyBytes, name: name);
       }
