@@ -4,3 +4,4 @@ build/
 .packages
 .idea/
 *.iml
+assets/fonts/*.ttf

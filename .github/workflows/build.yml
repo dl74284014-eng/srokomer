@@ -40,6 +40,13 @@ jobs:
           mkdir -p ~/.android
           cp tool/debug.keystore ~/.android/debug.keystore
 
+      - name: Korean font for PDF (Nanum Gothic, OFL)
+        run: |
+          mkdir -p assets/fonts
+          curl -fsSL -o assets/fonts/NanumGothic-Regular.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/nanumgothic/NanumGothic-Regular.ttf
+          curl -fsSL -o assets/fonts/NanumGothic-Bold.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/nanumgothic/NanumGothic-Bold.ttf
+          ls -la assets/fonts
+
       - name: Dependencies and icon
         run: |
           flutter pub get

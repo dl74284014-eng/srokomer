@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:excel/excel.dart' as xl;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -78,7 +81,7 @@ Future<File> buildXlsx() async {
   }
   final bytes = ex.save();
   final dir = await getTemporaryDirectory();
-  final f = File('${dir.path}/srokomer_${_stamp()}.xlsx');
+  final f = File('${dir.path}/lmart_${_stamp()}.xlsx');
   await f.writeAsBytes(bytes!);
   return f;
 }
@@ -150,8 +153,79 @@ Future<File> buildDocx() async {
   add('word/document.xml', b.toString());
   final bytes = ZipEncoder().encode(arc);
   final dir = await getTemporaryDirectory();
-  final f = File('${dir.path}/srokomer_${_stamp()}.docx');
+  final f = File('${dir.path}/lmart_${_stamp()}.docx');
   await f.writeAsBytes(bytes!);
+  return f;
+}
+
+// ---------------- текст (сообщение / .txt) ----------------
+String _dot(Item it) {
+  switch (urgency(daysLeft(it.expiry))) {
+    case Urg.red:
+      return '🔴';
+    case Urg.orange:
+      return '🟠';
+    case Urg.yellow:
+      return '🟡';
+    case Urg.green:
+      return '🟢';
+    case Urg.none:
+      return '⚪';
+  }
+}
+
+String buildText() {
+  final b = StringBuffer()
+    ..writeln('${t('export_doc_title')} · ${fmtDate(isoOf(DateTime.now()))}')
+    ..writeln('${store.items.length} ${t('pcs')}')
+    ..writeln();
+  for (final it in _sortedItems()) {
+    final q = it.qty > 1 ? ' ×${it.qty}' : '';
+    b.writeln('${_dot(it)} ${it.name}$q');
+    b.writeln('    ${t('until')} ${fmtDate(it.expiry)} · ${leftText(daysLeft(it.expiry))}'
+        '${it.notes.isNotEmpty ? ' · 📝 ${it.notes}' : ''}');
+  }
+  return b.toString();
+}
+
+Future<File> buildTxt() async {
+  final dir = await getTemporaryDirectory();
+  final f = File('${dir.path}/lmart_${_stamp()}.txt');
+  await f.writeAsString(buildText());
+  return f;
+}
+
+// ---------------- PDF ----------------
+Future<File> buildPdf() async {
+  final font = pw.Font.ttf(await rootBundle.load('assets/fonts/NanumGothic-Regular.ttf'));
+  final bold = pw.Font.ttf(await rootBundle.load('assets/fonts/NanumGothic-Bold.ttf'));
+  final doc = pw.Document(theme: pw.ThemeData.withFont(base: font, bold: bold));
+  final head = _headers();
+  final rows = _sortedItems().map(_row).toList();
+  doc.addPage(pw.MultiPage(
+    pageFormat: PdfPageFormat.a4.landscape,
+    margin: const pw.EdgeInsets.all(24),
+    build: (ctx) => [
+      pw.Text(t('export_doc_title'), style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+      pw.SizedBox(height: 4),
+      pw.Text('${fmtDate(isoOf(DateTime.now()))} · ${store.items.length} ${t('pcs')}',
+          style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+      pw.SizedBox(height: 10),
+      pw.TableHelper.fromTextArray(
+        headers: head,
+        data: rows,
+        headerStyle: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+        headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFE3F2EA)),
+        cellStyle: const pw.TextStyle(fontSize: 9),
+        cellAlignment: pw.Alignment.centerLeft,
+        oddRowDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF7F7F7)),
+        border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+      ),
+    ],
+  ));
+  final dir = await getTemporaryDirectory();
+  final f = File('${dir.path}/lmart_${_stamp()}.pdf');
+  await f.writeAsBytes(await doc.save());
   return f;
 }
 
@@ -160,36 +234,56 @@ Future<void> showExportSheet(BuildContext context) async {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('export_empty'))));
     return;
   }
+  Widget opt(BuildContext ctx, String k, Color c, String letter, String title, {String sub = ''}) => ListTile(
+        leading: CircleAvatar(
+            backgroundColor: c,
+            child: Text(letter, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13))),
+        title: Text(title, style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w600)),
+        subtitle: sub.isEmpty ? null : Text(sub),
+        onTap: () => Navigator.pop(ctx, k),
+      );
   final kind = await showModalBottomSheet<String>(
     context: context,
+    isScrollControlled: true,
     builder: (ctx) => SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text(t('export_title'), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
           const SizedBox(height: 4),
           Text(t('export_sub'), style: const TextStyle(color: Colors.black54)),
-          const SizedBox(height: 12),
-          ListTile(
-            leading: const CircleAvatar(backgroundColor: Color(0xFF1D6F42), child: Text('X', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
-            title: const Text('Excel (.xlsx)', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-            onTap: () => Navigator.pop(ctx, 'xlsx'),
-          ),
-          ListTile(
-            leading: const CircleAvatar(backgroundColor: Color(0xFF2B579A), child: Text('W', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
-            title: const Text('Word (.docx)', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-            onTap: () => Navigator.pop(ctx, 'docx'),
-          ),
+          const SizedBox(height: 8),
+          opt(ctx, 'msg', const Color(0xFFFEE500), '💬', t('export_msg'), sub: t('export_msg_sub')),
+          opt(ctx, 'pdf', const Color(0xFFD93025), 'PDF', 'PDF (.pdf)'),
+          opt(ctx, 'xlsx', const Color(0xFF1D6F42), 'X', 'Excel (.xlsx)'),
+          opt(ctx, 'docx', const Color(0xFF2B579A), 'W', 'Word (.docx)'),
+          opt(ctx, 'txt', const Color(0xFF616161), 'TXT', t('export_txt')),
         ]),
       ),
     ),
   );
   if (kind == null) return;
   try {
-    final f = kind == 'xlsx' ? await buildXlsx() : await buildDocx();
-    final mime = kind == 'xlsx'
-        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    if (kind == 'msg') {
+      await Share.share(buildText(), subject: t('export_doc_title'));
+      return;
+    }
+    final File f;
+    final String mime;
+    switch (kind) {
+      case 'xlsx':
+        f = await buildXlsx();
+        mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'docx':
+        f = await buildDocx();
+        mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'pdf':
+        f = await buildPdf();
+        mime = 'application/pdf';
+      default:
+        f = await buildTxt();
+        mime = 'text/plain';
+    }
     await Share.shareXFiles([XFile(f.path, mimeType: mime)], subject: t('export_doc_title'));
   } catch (e) {
     if (context.mounted) {

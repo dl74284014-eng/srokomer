@@ -149,7 +149,7 @@ int? daysLeft(String exp) {
 String fmtDate(String exp) {
   final e = parseIso(exp);
   if (e == null) return '—';
-  return '${e.day.toString().padLeft(2, '0')}.${e.month.toString().padLeft(2, '0')}.${e.year}';
+  return '${e.year}.${e.month.toString().padLeft(2, '0')}.${e.day.toString().padLeft(2, '0')}'; // ГГГГ.ММ.ДД — по-корейски, во всех языках
 }
 
 String plural(int n, String a, String b, String c) {
