@@ -146,8 +146,8 @@ class Store extends ChangeNotifier {
   }
 
   // Облако синхронизации (Supabase). Значения по умолчанию встраиваются в сборку.
-  static const _defaultSupaUrl = '';
-  static const _defaultSupaKey = '';
+  static const _defaultSupaUrl = 'https://xmcsewifdsgksywxrnmc.supabase.co';
+  static const _defaultSupaKey = 'sb_publishable_ruycDQwapaCfIWnHBXOUwg_iByjJTdR';
   String get supaUrl {
     final v = settings['supaUrl'] ?? '';
     return (v.isNotEmpty ? v : _defaultSupaUrl).trim().replaceAll(RegExp(r'/+$'), '');
