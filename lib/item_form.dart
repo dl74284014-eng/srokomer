@@ -155,13 +155,15 @@ class _ItemFormPageState extends State<ItemFormPage> {
       setState(() => expiry = gExp);
       _snack('${t('valid_until')}: ${fmtDate(gExp)} ✓');
     }
-    if (chosen == null || chosen.isEmpty || !mounted) {
+    // Снятое фото оставляем у товара, даже если название не подошло (раньше оно терялось)
+    final saved = photo.isEmpty ? await store.savePhotoFile(path) : photo;
+    if (!mounted) return;
+    if (photo.isEmpty) setState(() => photo = saved);
+    if (chosen == null || chosen.isEmpty) {
       nameFocus.requestFocus();
       return;
     }
     final String picked = chosen;
-    final saved = photo.isEmpty ? await store.savePhotoFile(path) : photo;
-    if (!mounted) return;
     setState(() {
       name.text = picked;
       if (!catManual) {
