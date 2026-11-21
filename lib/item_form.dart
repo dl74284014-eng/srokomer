@@ -56,6 +56,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
     mute = it.mute;
     if (category == 'other' && it.name.isNotEmpty) category = guessCategory(it.name);
     catManual = !widget.isNew;
+    geminiWarmUp(); // заранее открыть соединение — первое распознавание быстрее
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.autoOcr) {
         _ocrName();
@@ -81,9 +82,9 @@ class _ItemFormPageState extends State<ItemFormPage> {
 
   Future<XFile?> _shoot({bool camera = true}) => picker.pickImage(
         source: camera ? ImageSource.camera : ImageSource.gallery,
-        maxWidth: 1400,
-        maxHeight: 1400,
-        imageQuality: 85,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 82,
       );
 
   Future<void> _changePhoto(bool camera) async {
@@ -97,39 +98,53 @@ class _ItemFormPageState extends State<ItemFormPage> {
   Future<void> _ocrName() async {
     final x = await _shoot();
     if (x == null || !mounted) return;
-    // 1) Gemini (точное чтение), 2) запасной вариант — ML Kit на телефоне
-    final g = await withLoading(context, t('reading_text'), () => geminiRead(x.path));
-    if (!mounted) return;
-    String? chosen;
-    String gCat = 'other';
-    if (g != null && g.names.isNotEmpty) {
-      gCat = g.category;
-      final ans = await askThisOne(context, title: t('is_name_q'), text: g.names.first, imagePath: x.path);
-      if (!mounted) return;
-      if (ans == true) {
-        chosen = g.names.first;
-      } else if (ans == false && g.names.length > 1) {
-        chosen = await pickOne(context, t('pick_variant'), g.names.skip(1).toList());
-      }
-      if (chosen != null && expiry.isEmpty && g.expiry.isNotEmpty) {
-        setState(() => expiry = g.expiry);
-        _snack('${t('valid_until')}: ${fmtDate(g.expiry)} ✓');
-      }
-    } else {
-      final lines = await withLoading(context, t('reading_text'), () => ocrLines(x.path));
-      if (!mounted) return;
+    // Параллельно: мгновенное распознавание на телефоне + точное через Gemini.
+    // Окно «Это название?» показывается сразу и уточняется, когда придёт ответ Gemini.
+    final text = ValueNotifier<String?>(null);
+    final refining = ValueNotifier<bool>(true);
+    var alts = <String>[];
+    var gExp = '';
+    var mlDone = false, gDone = false;
+    void finish() {
+      if (mlDone && gDone) refining.value = false;
+    }
+
+    ocrLines(x.path).then((lines) {
       final c = nameCandidates(lines);
-      if (c.isEmpty) {
-        _snack(t('no_text'));
-        return;
+      alts = [...alts, ...c.where((e) => !alts.contains(e))];
+      if (text.value == null && c.isNotEmpty) text.value = c.first;
+    }).catchError((_) {}).whenComplete(() {
+      mlDone = true;
+      finish();
+    });
+    var gotGemini = false;
+    geminiRead(x.path).then((g) {
+      if (g != null && g.names.isNotEmpty) {
+        gotGemini = true;
+        text.value = g.names.first;
+        alts = [...g.names, ...alts.where((e) => !g.names.contains(e))];
+        gExp = g.expiry;
       }
-      final ans = await askThisOne(context, title: t('is_name_q'), text: c.first, imagePath: x.path);
-      if (!mounted) return;
-      if (ans == true) {
-        chosen = c.first;
-      } else if (ans == false) {
-        chosen = await pickLines(context, c);
-      }
+    }).catchError((_) {}).whenComplete(() {
+      gDone = true;
+      // Gemini ответил — дальше ждать телефонное распознавание незачем
+      if (gotGemini) mlDone = true;
+      finish();
+    });
+
+    String gCat = 'other';
+    String? chosen;
+    final ans = await askLive(context, title: t('is_name_q'), text: text, refining: refining, imagePath: x.path);
+    if (!mounted) return;
+    if (ans == true) {
+      chosen = text.value;
+    } else if (ans == false) {
+      final rest = alts.where((e) => e != text.value).toList();
+      if (rest.isNotEmpty) chosen = await pickOne(context, t('pick_variant'), rest);
+    }
+    if (chosen != null && expiry.isEmpty && gExp.isNotEmpty) {
+      setState(() => expiry = gExp);
+      _snack('${t('valid_until')}: ${fmtDate(gExp)} ✓');
     }
     if (chosen == null || chosen.isEmpty || !mounted) {
       nameFocus.requestFocus();

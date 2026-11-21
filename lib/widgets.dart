@@ -172,3 +172,58 @@ Future<String?> pickOne(BuildContext context, String title, List<String> options
     ),
   );
 }
+
+/// «Это оно?» с живым обновлением: сначала быстрый результат с телефона,
+/// затем, когда придёт ответ Gemini, текст уточняется прямо в окне.
+Future<bool?> askLive(BuildContext context,
+    {required String title,
+    required ValueNotifier<String?> text,
+    required ValueNotifier<bool> refining,
+    String imagePath = ''}) {
+  return showDialog<bool>(
+    context: context,
+    builder: (ctx) => AnimatedBuilder(
+      animation: Listenable.merge([text, refining]),
+      builder: (ctx, _) {
+        final v = text.value;
+        final busy = refining.value;
+        return AlertDialog(
+          title: Text(title),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (imagePath.isNotEmpty && File(imagePath).existsSync())
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    height: 150,
+                    color: const Color(0xFFF1EEE7),
+                    child: Image.file(File(imagePath), fit: BoxFit.contain, cacheWidth: 600),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              if (v != null)
+                Text(v, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800))
+              else if (!busy)
+                Text(t('no_text'), style: const TextStyle(color: Colors.black54)),
+              const SizedBox(height: 8),
+              if (busy)
+                Row(children: [
+                  const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(t('refining'), style: const TextStyle(color: Colors.black54, fontSize: 13))),
+                ])
+              else if (v != null)
+                Text(t('refined'), style: const TextStyle(color: Color(0xFF2A8A57), fontSize: 13)),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(v == null ? t('type_myself') : t('no'))),
+            FilledButton(onPressed: v == null ? null : () => Navigator.pop(ctx, true), child: Text(t('yes'))),
+          ],
+        );
+      },
+    ),
+  );
+}
