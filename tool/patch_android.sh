@@ -28,6 +28,20 @@ cat > android/app/src/main/res/values-ko/strings.xml <<'XML'
 <resources><string name="app_name">L할인마트 유통기한</string></resources>
 XML
 
+# ПОСТОЯННАЯ подпись приложения: одна и та же для всех версий, иначе Android не даёт
+# установить обновление поверх (и приходится удалять приложение вместе с данными).
+GK=android/app/build.gradle.kts
+GG=android/app/build.gradle
+if [ -f "$GK" ] && ! grep -q 'create("fixed")' "$GK"; then
+  sed -i 's#^    buildTypes {#    signingConfigs {\n        create("fixed") {\n            storeFile = file("../../tool/debug.keystore")\n            storePassword = "android"\n            keyAlias = "androiddebugkey"\n            keyPassword = "android"\n        }\n    }\n    buildTypes {#' "$GK"
+  sed -i 's#signingConfigs.getByName("debug")#signingConfigs.getByName("fixed")#' "$GK"
+  grep -q 'getByName("fixed")' "$GK" || { echo "signing patch failed"; exit 1; }
+elif [ -f "$GG" ] && ! grep -q 'fixed {' "$GG"; then
+  sed -i 's#^    buildTypes {#    signingConfigs {\n        fixed {\n            storeFile file("../../tool/debug.keystore")\n            storePassword "android"\n            keyAlias "androiddebugkey"\n            keyPassword "android"\n        }\n    }\n    buildTypes {#' "$GG"
+  sed -i 's#signingConfig signingConfigs.debug#signingConfig signingConfigs.fixed#' "$GG"
+  grep -q 'signingConfigs.fixed' "$GG" || { echo "signing patch failed"; exit 1; }
+fi
+
 # Корейская модель распознавания текста ML Kit
 if [ -f android/app/build.gradle ]; then
   G=android/app/build.gradle

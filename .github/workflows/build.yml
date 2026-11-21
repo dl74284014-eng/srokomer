@@ -58,6 +58,13 @@ jobs:
       - name: Build APK
         run: flutter build apk --release --build-number=${{ github.run_number }} --build-name=1.4.${{ github.run_number }} --dart-define=BUILD_NUMBER=${{ github.run_number }} --dart-define=BUILD_NAME=1.4.${{ github.run_number }}
 
+      - name: Verify the APK is signed with the fixed key
+        run: |
+          APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | tail -1)
+          $APKSIGNER verify --print-certs build/app/outputs/flutter-apk/app-release.apk | tee certs.txt
+          EXPECTED=$(keytool -list -v -keystore tool/debug.keystore -storepass android | grep 'SHA256:' | head -1 | sed 's/.*SHA256: //; s/://g' | tr 'A-F' 'a-f')
+          grep -qi "$EXPECTED" certs.txt || (echo "WRONG SIGNING KEY" && exit 1)
+
       - name: Rename
         run: cp build/app/outputs/flutter-apk/app-release.apk srokomer.apk
 
