@@ -29,7 +29,9 @@ Future<LookupResult?> lookupBarcode(String code, {String mfdsKey = '', String ka
   r ??= await _off(code);
   if (r == null && kakaoKey.isNotEmpty) r = await _kakaoGuess(kakaoKey, code);
   if (r != null && r.imageUrl.isEmpty && kakaoKey.isNotEmpty) {
-    r.imageUrl = await kakaoImage(kakaoKey, r.name) ?? '';
+    final imgs = await kakaoImages(kakaoKey, r.name, size: 3);
+    // несколько вариантов подряд — download() возьмёт первый, который скачается
+    r.imageUrl = imgs.map((e) => e.both).join('\n');
   }
   return r;
 }
@@ -163,6 +165,49 @@ Future<String?> kakaoImage(String key, String name) async {
     }
   } catch (_) {}
   return null;
+}
+
+/// Название без объёма/веса/количества — для поиска картинок.
+String shortName(String name) => name
+    .replaceAll(RegExp(r'\(?\d+([.,]\d+)?\s*(ml|mL|ML|l|L|g|G|kg|KG|Kg|개입|개|입|병|매|팩|봉|캔|CAN|can|box|BOX)\s*([x×*X]\s*\d+\s*(개입|개|입|병|매|팩|봉|캔|ea|EA)?)?\)?'), ' ')
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();
+
+class WebImage {
+  final String full, thumb;
+  WebImage(this.full, this.thumb);
+  String get both => '$full\n$thumb';
+}
+
+String lastImageError = '';
+
+/// Несколько картинок товара из поиска Kakao (Daum): сначала по полному названию, затем по короткому.
+Future<List<WebImage>> kakaoImages(String key, String name, {int size = 12}) async {
+  lastImageError = '';
+  final out = <WebImage>[];
+  final queries = <String>{name.trim(), shortName(name)}..removeWhere((q) => q.length < 2);
+  for (final q in queries) {
+    try {
+      final uri = Uri.https('dapi.kakao.com', '/v2/search/image', {'query': q, 'size': '$size'});
+      final r = await http.get(uri, headers: {'Authorization': 'KakaoAK $key'}).timeout(_timeout);
+      if (r.statusCode != 200) {
+        lastImageError = 'Kakao HTTP ${r.statusCode}: ${utf8.decode(r.bodyBytes)}';
+        continue;
+      }
+      final j = jsonDecode(utf8.decode(r.bodyBytes));
+      final docs = (j is Map && j['documents'] is List) ? j['documents'] as List : const [];
+      for (final d in docs) {
+        if (d is! Map) continue;
+        final u = _s(d, 'image_url'), th = _s(d, 'thumbnail_url');
+        if (u.isEmpty && th.isEmpty) continue;
+        out.add(WebImage(u, th.isNotEmpty ? th : u));
+      }
+      if (out.length >= 4) break;
+    } catch (e) {
+      lastImageError = '$e';
+    }
+  }
+  return out;
 }
 
 /// Проверка ключа Kakao: null — работает.

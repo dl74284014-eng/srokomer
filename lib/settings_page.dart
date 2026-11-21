@@ -10,6 +10,7 @@ import 'auth.dart';
 import 'store.dart';
 import 'sync.dart';
 import 'updater.dart';
+import 'widgets.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -475,6 +476,30 @@ class _SettingsPageState extends State<SettingsPage> {
             status: kakaoStatus,
             onCheck: _checkKakao,
             settingKey: 'kakaoKey',
+          ),
+          const SizedBox(height: 10),
+          FilledButton.tonalIcon(
+            onPressed: () async {
+              final prog = ValueNotifier<String>('…');
+              showDialog<void>(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => AlertDialog(
+                  content: Row(children: [
+                    const SizedBox(width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 3)),
+                    const SizedBox(width: 14),
+                    Expanded(child: ValueListenableBuilder<String>(valueListenable: prog, builder: (_, v, __) => Text(v))),
+                  ]),
+                ),
+              );
+              final n = await fillMissingPhotos((d, tot) => prog.value = '${t('photo_searching')} $d / $tot');
+              if (!mounted) return;
+              Navigator.of(context, rootNavigator: true).pop();
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('${t('photo_found_n')}: $n${lastImageError.isNotEmpty && n == 0 ? '\n$lastImageError' : ''}')));
+            },
+            icon: const Icon(Icons.image_search),
+            label: Text(t('photo_fill_all')),
           ),
           const SizedBox(height: 10),
           _keyBlock(

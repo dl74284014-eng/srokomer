@@ -351,6 +351,15 @@ class _ItemFormPageState extends State<ItemFormPage> {
               ),
             ),
           ]),
+          const SizedBox(height: 6),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final p = await pickWebPhoto(context, name.text);
+              if (p != null && mounted) setState(() => photo = p);
+            },
+            icon: const Icon(Icons.image_search),
+            label: Text(t('photo_web')),
+          ),
           gap,
           // название
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [

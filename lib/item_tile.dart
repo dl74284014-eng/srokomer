@@ -6,6 +6,7 @@ import 'item_form.dart';
 import 'l10n.dart';
 import 'models.dart';
 import 'store.dart';
+import 'widgets.dart';
 
 Future<void> openItemForm(BuildContext context, Item it,
     {bool isNew = true, String info = '', bool focusName = false, bool autoOcr = false}) {
@@ -127,6 +128,7 @@ Future<void> showItemActions(BuildContext context, Item it) async {
           const Divider(height: 1),
           tile('edit', Icons.edit_outlined, t('act_edit')),
           tile('date', Icons.event_outlined, t('act_date')),
+          tile('photo', Icons.image_search, t('photo_web')),
           if (it.qty > 1) tile('minus', Icons.remove_circle_outline, t('act_minus')),
           tile('delete', Icons.delete_outline, t('delete'), color: const Color(0xFFD6363B)),
           const SizedBox(height: 8),
@@ -149,6 +151,14 @@ Future<void> showItemActions(BuildContext context, Item it) async {
       );
       if (d != null) {
         final n = Item.fromJson(it.toJson())..expiry = isoOf(d);
+        await store.upsertItem(n);
+      }
+    case 'photo':
+      final p = await pickWebPhoto(context, it.name);
+      if (p != null) {
+        final n = Item.fromJson(it.toJson())
+          ..photo = p
+          ..photoRemote = '';
         await store.upsertItem(n);
       }
     case 'minus':
