@@ -99,7 +99,6 @@ class SyncService extends ChangeNotifier {
 
   /// Ошибка с фото (не мешает сохранять товары). Пусто — всё хорошо.
   String photoWarning = '';
-  final Set<String> _photoRetry = {};
 
   Future<bool> _tryUpload(String localPath, String remoteName) async {
     try {
@@ -114,8 +113,25 @@ class SyncService extends ChangeNotifier {
 
   String _fileName(String path) => path.split('/').last;
 
+  DateTime? _photoFailAt; // после ошибки фото не повторяем чаще раза в минуту
+  final Set<String> _photoUpItems = {};
+  final Set<String> _photoUpProducts = {};
+
+  bool _scannedPhotos = false;
+
   Future<void> _push() async {
     final space = auth.uid;
+    if (!_scannedPhotos) {
+      // при запуске: найти фото, которые ещё не попали в облако
+      _scannedPhotos = true;
+      for (final it in store.items) {
+        if (it.photo.isNotEmpty && it.photoRemote.isEmpty && File(it.photo).existsSync()) _photoUpItems.add(it.id);
+      }
+      store.products.forEach((c, p) {
+        if (p.photo.isNotEmpty && p.photoRemote.isEmpty && File(p.photo).existsSync()) _photoUpProducts.add(c);
+      });
+    }
+    // 1) Сначала сами товары — они появятся на других телефонах сразу.
     if (store.dirtyItems.isNotEmpty) {
       final ids = store.dirtyItems.toList();
       final rows = <Map<String, dynamic>>[];
@@ -123,14 +139,7 @@ class SyncService extends ChangeNotifier {
         final idx = store.items.indexWhere((e) => e.id == id);
         final Item? it = idx >= 0 ? store.items[idx] : null;
         if (it != null) {
-          if (it.photo.isNotEmpty && it.photoRemote.isEmpty && File(it.photo).existsSync()) {
-            final rn = '$space/${_fileName(it.photo)}';
-            if (await _tryUpload(it.photo, rn)) {
-              it.photoRemote = rn;
-            } else {
-              _photoRetry.add(id); // товар сохраняем сейчас, фото дошлём позже
-            }
-          }
+          if (it.photo.isNotEmpty && it.photoRemote.isEmpty && File(it.photo).existsSync()) _photoUpItems.add(id);
           final data = it.toJson()..remove('photo');
           rows.add({'owner': space, 'id': id, 'data': data, 'updated_at': it.updatedAt, 'deleted': false});
         } else {
@@ -144,8 +153,6 @@ class SyncService extends ChangeNotifier {
           .timeout(const Duration(seconds: 30));
       if (r.statusCode >= 300) throw 'items ${r.statusCode}: ${utf8.decode(r.bodyBytes)}';
       store.dirtyItems.removeAll(ids);
-      store.dirtyItems.addAll(_photoRetry); // повторить отправку фото в следующий раз
-      _photoRetry.clear();
       await store.save();
     }
     if (store.dirtyProducts.isNotEmpty) {
@@ -154,10 +161,7 @@ class SyncService extends ChangeNotifier {
       for (final c in codes) {
         final p = store.products[c];
         if (p == null) continue;
-        if (p.photo.isNotEmpty && p.photoRemote.isEmpty && File(p.photo).existsSync()) {
-          final rn = '$space/${_fileName(p.photo)}';
-          if (await _tryUpload(p.photo, rn)) p.photoRemote = rn;
-        }
+        if (p.photo.isNotEmpty && p.photoRemote.isEmpty && File(p.photo).existsSync()) _photoUpProducts.add(c);
         final data = p.toJson()..remove('photo');
         rows.add({'owner': space, 'code': c, 'data': data, 'updated_at': p.updatedAt});
       }
@@ -171,6 +175,45 @@ class SyncService extends ChangeNotifier {
       store.dirtyProducts.removeAll(codes);
       await store.save();
     }
+    // 2) Потом фото (по 5 за раз). Удачно отправленные — товар уходит ещё раз уже со ссылкой на фото.
+    if (_photoFailAt != null && DateTime.now().difference(_photoFailAt!).inSeconds < 60) return;
+    var budget = 5;
+    for (final id in _photoUpItems.toList()) {
+      if (budget-- <= 0) break;
+      final idx = store.items.indexWhere((e) => e.id == id);
+      if (idx < 0 || store.items[idx].photoRemote.isNotEmpty || store.items[idx].photo.isEmpty) {
+        _photoUpItems.remove(id);
+        continue;
+      }
+      final it = store.items[idx];
+      final rn = '$space/${_fileName(it.photo)}';
+      if (await _tryUpload(it.photo, rn)) {
+        it.photoRemote = rn;
+        _photoUpItems.remove(id);
+        store.dirtyItems.add(id);
+      } else {
+        _photoFailAt = DateTime.now();
+        return;
+      }
+    }
+    for (final c in _photoUpProducts.toList()) {
+      if (budget-- <= 0) break;
+      final p = store.products[c];
+      if (p == null || p.photoRemote.isNotEmpty || p.photo.isEmpty) {
+        _photoUpProducts.remove(c);
+        continue;
+      }
+      final rn = '$space/${_fileName(p.photo)}';
+      if (await _tryUpload(p.photo, rn)) {
+        p.photoRemote = rn;
+        _photoUpProducts.remove(c);
+        store.dirtyProducts.add(c);
+      } else {
+        _photoFailAt = DateTime.now();
+        return;
+      }
+    }
+    if (store.dirtyItems.isNotEmpty || store.dirtyProducts.isNotEmpty) await store.save();
   }
 
   // ---------------- получение ----------------
@@ -265,9 +308,9 @@ class SyncService extends ChangeNotifier {
       'owner': 'eq.${auth.uid}',
       'select': '*',
       'order': 'synced_at.asc',
-      'limit': '1000',
+      'limit': '5000',
     };
-    if (since.isNotEmpty) q['synced_at'] = 'gte.$since';
+    if (since.isNotEmpty) q['synced_at'] = 'gt.$since'; // только новое — экономия трафика
     final r = await http.get(_rest(table, q), headers: _h).timeout(const Duration(seconds: 30));
     if (r.statusCode >= 300) throw '$table ${r.statusCode}: ${utf8.decode(r.bodyBytes)}';
     final list = jsonDecode(utf8.decode(r.bodyBytes));
@@ -349,11 +392,12 @@ class SyncService extends ChangeNotifier {
     store.settings['syncSinceProducts'] = '';
     store.markAllDirty();
     // фото нужно загрузить в папку этого аккаунта
+    final mine = '${auth.uid}/';
     for (final it in store.items) {
-      it.photoRemote = '';
+      if (!it.photoRemote.startsWith(mine)) it.photoRemote = '';
     }
     for (final p in store.products.values) {
-      p.photoRemote = '';
+      if (!p.photoRemote.startsWith(mine)) p.photoRemote = '';
     }
     await store.save();
     await syncNow();
