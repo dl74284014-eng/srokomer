@@ -10,6 +10,7 @@ import 'models.dart';
 import 'notify.dart';
 import 'scanner_page.dart';
 import 'settings_page.dart';
+import 'auth.dart';
 import 'store.dart';
 import 'sync.dart';
 import 'widgets.dart';
@@ -64,7 +65,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    store.addListener(_onStore); // смена языка и данных — перерисовать весь экран (шапку и кнопки тоже)
+    store.addListener(_onStore);
+    auth.addListener(_onStore); // смена языка и данных — перерисовать весь экран (шапку и кнопки тоже)
     syncer.syncNow();
     syncer.startPeriodic();
     if (notifier.on) notifier.requestPermission();
@@ -74,6 +76,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     store.removeListener(_onStore);
+    auth.removeListener(_onStore);
     syncer.stopPeriodic();
     super.dispose();
   }
@@ -269,6 +272,27 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 20),
       children: [
+        if (auth.configured && !auth.loggedIn)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Material(
+              color: const Color(0xFFFFF0E0),
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => _open(const SettingsPage()),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(children: [
+                    const Text('☁️', style: TextStyle(fontSize: 22)),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(t('acc_banner'), style: const TextStyle(fontSize: 14))),
+                    const Icon(Icons.chevron_right),
+                  ]),
+                ),
+              ),
+            ),
+          ),
         // ---- светофор сроков ----
         Row(children: [
           _stat(red, t('expired'), Urg.red, () => _open(ListPage(urg: Urg.red, title: t('expired_list')))),

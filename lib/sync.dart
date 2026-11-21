@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
+import 'auth.dart';
 import 'store.dart';
 
 /// Синхронизация между телефонами через Supabase (REST).
@@ -19,7 +20,8 @@ class SyncService extends ChangeNotifier {
   Timer? _periodic;
   bool _again = false;
 
-  bool get enabled => store.supaUrl.isNotEmpty && store.supaKey.isNotEmpty && store.syncSpace.isNotEmpty;
+  bool get enabled => auth.configured && auth.loggedIn;
+  String _token = '';
 
   void attach() {
     store.onLocalChange = () {
@@ -38,14 +40,11 @@ class SyncService extends ChangeNotifier {
     _periodic = null;
   }
 
-  Map<String, String> get _h {
-    final k = store.supaKey;
-    return {
-      'apikey': k,
-      if (k.startsWith('eyJ')) 'Authorization': 'Bearer $k',
-      'Content-Type': 'application/json',
-    };
-  }
+  Map<String, String> get _h => {
+        'apikey': store.supaKey,
+        'Authorization': 'Bearer $_token',
+        'Content-Type': 'application/json',
+      };
 
   Uri _rest(String table, [Map<String, String>? q]) {
     final base = Uri.parse(store.supaUrl);
@@ -67,6 +66,9 @@ class SyncService extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
+      final tk = await auth.accessToken();
+      if (tk == null) throw 'login';
+      _token = tk;
       await _push();
       await _pull();
       lastOk = DateTime.now();
@@ -97,7 +99,7 @@ class SyncService extends ChangeNotifier {
   String _fileName(String path) => path.split('/').last;
 
   Future<void> _push() async {
-    final space = store.syncSpace;
+    final space = auth.uid;
     if (store.dirtyItems.isNotEmpty) {
       final ids = store.dirtyItems.toList();
       final rows = <Map<String, dynamic>>[];
@@ -111,14 +113,14 @@ class SyncService extends ChangeNotifier {
             it.photoRemote = rn;
           }
           final data = it.toJson()..remove('photo');
-          rows.add({'space': space, 'id': id, 'data': data, 'updated_at': it.updatedAt, 'deleted': false});
+          rows.add({'owner': space, 'id': id, 'data': data, 'updated_at': it.updatedAt, 'deleted': false});
         } else {
           final ts = store.tombstones[id] ?? DateTime.now().millisecondsSinceEpoch;
-          rows.add({'space': space, 'id': id, 'data': {}, 'updated_at': ts, 'deleted': true});
+          rows.add({'owner': space, 'id': id, 'data': {}, 'updated_at': ts, 'deleted': true});
         }
       }
       final r = await http
-          .post(_rest('items', {'on_conflict': 'space,id'}),
+          .post(_rest('items', {'on_conflict': 'owner,id'}),
               headers: {..._h, 'Prefer': 'resolution=merge-duplicates,return=minimal'}, body: jsonEncode(rows))
           .timeout(const Duration(seconds: 30));
       if (r.statusCode >= 300) throw 'items ${r.statusCode}: ${utf8.decode(r.bodyBytes)}';
@@ -137,11 +139,11 @@ class SyncService extends ChangeNotifier {
           p.photoRemote = rn;
         }
         final data = p.toJson()..remove('photo');
-        rows.add({'space': space, 'code': c, 'data': data, 'updated_at': p.updatedAt});
+        rows.add({'owner': space, 'code': c, 'data': data, 'updated_at': p.updatedAt});
       }
       if (rows.isNotEmpty) {
         final r = await http
-            .post(_rest('products', {'on_conflict': 'space,code'}),
+            .post(_rest('products', {'on_conflict': 'owner,code'}),
                 headers: {..._h, 'Prefer': 'resolution=merge-duplicates,return=minimal'}, body: jsonEncode(rows))
             .timeout(const Duration(seconds: 30));
         if (r.statusCode >= 300) throw 'products ${r.statusCode}: ${utf8.decode(r.bodyBytes)}';
@@ -169,7 +171,7 @@ class SyncService extends ChangeNotifier {
   Future<List<Map<String, dynamic>>> _fetch(String table, String sinceKey) async {
     final since = store.settings[sinceKey] ?? '';
     final q = <String, String>{
-      'space': 'eq.${store.syncSpace}',
+      'owner': 'eq.${auth.uid}',
       'select': '*',
       'order': 'synced_at.asc',
       'limit': '1000',
@@ -240,14 +242,18 @@ class SyncService extends ChangeNotifier {
     if (changed) store.notify();
   }
 
-  /// Подключиться к коду другого телефона: всё местное объединится с общим.
-  Future<void> joinSpace(String code) async {
-    code = code.trim().toUpperCase();
-    if (code.isEmpty || code == store.syncSpace) return;
-    store.settings['syncSpace'] = code;
+  /// После входа в аккаунт: всё, что есть на телефоне, объединяется с облаком.
+  Future<void> afterLogin() async {
     store.settings['syncSinceItems'] = '';
     store.settings['syncSinceProducts'] = '';
     store.markAllDirty();
+    // фото нужно загрузить в папку этого аккаунта
+    for (final it in store.items) {
+      it.photoRemote = '';
+    }
+    for (final p in store.products.values) {
+      p.photoRemote = '';
+    }
     await store.save();
     await syncNow();
   }
@@ -255,6 +261,7 @@ class SyncService extends ChangeNotifier {
   /// Проверка подключения: null — всё хорошо.
   Future<String?> test() async {
     if (store.supaUrl.isEmpty || store.supaKey.isEmpty) return 'URL / key?';
+    _token = (await auth.accessToken()) ?? store.supaKey;
     try {
       final r = await http
           .get(_rest('items', {'select': 'id', 'limit': '1'}), headers: _h)

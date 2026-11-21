@@ -6,6 +6,7 @@ import 'gemini.dart';
 import 'lookup.dart';
 import 'models.dart';
 import 'notify.dart';
+import 'auth.dart';
 import 'store.dart';
 import 'sync.dart';
 
@@ -38,6 +39,8 @@ class _SettingsPageState extends State<SettingsPage> {
     gem.dispose();
     supaKey.dispose();
     joinCode.dispose();
+    email.dispose();
+    pass.dispose();
     super.dispose();
   }
 
@@ -126,16 +129,132 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  final TextEditingController email = TextEditingController();
+  final TextEditingController pass = TextEditingController();
+  bool authBusy = false;
+  String? authMsg;
+
+  Future<void> _doAuth(bool register) async {
+    final e = email.text.trim(), p = pass.text;
+    if (!e.contains('@') || p.length < 6) {
+      setState(() => authMsg = '❌ ${t('auth_bad_input')}');
+      return;
+    }
+    setState(() {
+      authBusy = true;
+      authMsg = null;
+    });
+    final err = register ? await auth.signUp(e, p) : await auth.signIn(e, p);
+    if (!mounted) return;
+    setState(() {
+      authBusy = false;
+      authMsg = err == null ? null : (err == 'confirm' ? t('auth_confirm') : '❌ $err');
+    });
+    if (err == null) {
+      pass.clear();
+      syncer.afterLogin();
+    }
+  }
+
   Widget _syncBlock() {
     return ListenableBuilder(
-      listenable: syncer,
+      listenable: Listenable.merge([syncer, auth]),
       builder: (context, _) {
+        final card = (List<Widget> children) => Card(
+              elevation: 0,
+              color: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+              ),
+            );
+        final head = [
+          Text('☁️ ${t('acc_title')}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+          const SizedBox(height: 6),
+          Text(t('acc_text'), style: const TextStyle(color: Colors.black54, height: 1.4)),
+          const SizedBox(height: 12),
+        ];
+        final server = <Widget>[
+          TextButton(
+            onPressed: () => setState(() => showServer = !showServer),
+            child: Text('${t('sync_server')} ${showServer ? '▲' : '▼'}'),
+          ),
+          if (showServer) ...[
+            TextField(
+              controller: supaUrl,
+              autocorrect: false,
+              decoration: const InputDecoration(labelText: 'Project URL', border: OutlineInputBorder(), isDense: true),
+              onChanged: (v) => store.setSetting('supaUrl', v.trim()),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: supaKey,
+              autocorrect: false,
+              decoration: const InputDecoration(labelText: 'anon / publishable key', border: OutlineInputBorder(), isDense: true),
+              onChanged: (v) => store.setSetting('supaKey', v.trim()),
+            ),
+          ],
+        ];
+
+        if (!auth.configured) {
+          return card([...head, Text(t('sync_off'), style: const TextStyle(color: Color(0xFFE5740B))), ...server]);
+        }
+
+        if (!auth.loggedIn) {
+          return card([
+            ...head,
+            TextField(
+              controller: email,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: InputDecoration(labelText: t('acc_email'), border: const OutlineInputBorder(), isDense: true),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: pass,
+              obscureText: true,
+              decoration: InputDecoration(labelText: t('acc_pass'), border: const OutlineInputBorder(), isDense: true),
+            ),
+            const SizedBox(height: 10),
+            Row(children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: authBusy ? null : () => _doAuth(false),
+                  child: Text(t('acc_login')),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: authBusy ? null : () => _doAuth(true),
+                  child: Text(t('acc_register')),
+                ),
+              ),
+            ]),
+            TextButton(
+              onPressed: authBusy
+                  ? null
+                  : () async {
+                      final e = email.text.trim();
+                      if (!e.contains('@')) {
+                        setState(() => authMsg = '❌ ${t('auth_bad_input')}');
+                        return;
+                      }
+                      final err = await auth.resetPassword(e);
+                      if (!mounted) return;
+                      setState(() => authMsg = err == null ? t('acc_reset_sent') : '❌ $err');
+                    },
+              child: Text(t('acc_forgot')),
+            ),
+            if (authBusy) const LinearProgressIndicator(),
+            if (authMsg != null) Text(authMsg!, style: TextStyle(color: authMsg!.startsWith('❌') ? const Color(0xFFD6363B) : const Color(0xFF2A8A57))),
+            ...server,
+          ]);
+        }
+
         String st;
         Color col = Colors.black54;
-        if (!syncer.enabled) {
-          st = t('sync_off');
-          col = const Color(0xFFE5740B);
-        } else if (syncer.running) {
+        if (syncer.running) {
           st = '⟳ …';
         } else if (syncer.error != null) {
           st = '❌ ${syncer.error}';
@@ -147,113 +266,48 @@ class _SettingsPageState extends State<SettingsPage> {
         } else {
           st = '';
         }
-        return Card(
-          elevation: 0,
-          color: Colors.white,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text(t('sync_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
-              const SizedBox(height: 6),
-              Text(t('sync_text'), style: const TextStyle(color: Colors.black54, height: 1.4)),
-              const SizedBox(height: 14),
-              Text(t('sync_code'), style: const TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 6),
-              Row(children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                    decoration: BoxDecoration(color: const Color(0xFFE3F2EA), borderRadius: BorderRadius.circular(10)),
-                    child: SelectableText(store.syncSpace,
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: 1.5)),
+        return card([
+          ...head,
+          Row(children: [
+            const CircleAvatar(child: Icon(Icons.person)),
+            const SizedBox(width: 10),
+            Expanded(child: Text(auth.email, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
+          ]),
+          const SizedBox(height: 10),
+          Text(t('acc_other_phones'), style: const TextStyle(color: Colors.black54, fontSize: 13)),
+          const SizedBox(height: 10),
+          Row(children: [
+            FilledButton.tonalIcon(
+              onPressed: syncer.running ? null : syncer.syncNow,
+              icon: const Icon(Icons.sync),
+              label: Text(t('sync_now')),
+            ),
+            const Spacer(),
+            TextButton(
+              onPressed: () async {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: Text(t('acc_logout_q')),
+                    content: Text(t('acc_logout_sub')),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('cancel'))),
+                      FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('acc_logout'))),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.tonal(
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: store.syncSpace));
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('copied'))));
-                  },
-                  child: Text(t('copy')),
-                ),
-              ]),
-              const SizedBox(height: 4),
-              Text(t('sync_code_help'), style: const TextStyle(color: Colors.black54, fontSize: 13)),
-              const SizedBox(height: 14),
-              Text(t('sync_join'), style: const TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 6),
-              Row(children: [
-                Expanded(
-                  child: TextField(
-                    controller: joinCode,
-                    textCapitalization: TextCapitalization.characters,
-                    decoration: const InputDecoration(hintText: 'XXXX-XXXX-XXXX', border: OutlineInputBorder(), isDense: true),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: () async {
-                    final c = joinCode.text.trim();
-                    if (c.length < 6) return;
-                    await syncer.joinSpace(c);
-                    joinCode.clear();
-                    if (!mounted) return;
-                    setState(() {});
-                    ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(t('sync_joined'))));
-                  },
-                  child: Text(t('sync_join_btn')),
-                ),
-              ]),
-              const SizedBox(height: 14),
-              Row(children: [
-                FilledButton.tonalIcon(
-                  onPressed: syncer.running || !syncer.enabled ? null : syncer.syncNow,
-                  icon: const Icon(Icons.sync),
-                  label: Text(t('sync_now')),
-                ),
-              ]),
-              if (st.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(st, style: TextStyle(color: col, fontWeight: FontWeight.w600)),
-                ),
-              const SizedBox(height: 6),
-              TextButton(
-                onPressed: () => setState(() => showServer = !showServer),
-                child: Text('${t('sync_server')} ${showServer ? '▲' : '▼'}'),
-              ),
-              if (showServer) ...[
-                TextField(
-                  controller: supaUrl,
-                  autocorrect: false,
-                  decoration: const InputDecoration(labelText: 'Project URL', border: OutlineInputBorder(), isDense: true),
-                  onChanged: (v) => store.setSetting('supaUrl', v.trim()),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: supaKey,
-                  autocorrect: false,
-                  decoration: const InputDecoration(labelText: 'anon / publishable key', border: OutlineInputBorder(), isDense: true),
-                  onChanged: (v) => store.setSetting('supaKey', v.trim()),
-                ),
-                const SizedBox(height: 8),
-                Row(children: [
-                  FilledButton.tonal(
-                    onPressed: () async {
-                      final e = await syncer.test();
-                      if (!mounted) return;
-                      setState(() => syncTest = e == null ? t('key_ok') : '❌ $e');
-                      if (e == null) syncer.syncNow();
-                    },
-                    child: Text(t('check')),
-                  ),
-                  const SizedBox(width: 10),
-                  if (syncTest != null) Expanded(child: Text(syncTest!)),
-                ]),
-              ],
-            ]),
-          ),
-        );
+                );
+                if (ok == true) await auth.signOut();
+              },
+              child: Text(t('acc_logout')),
+            ),
+          ]),
+          if (st.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(st, style: TextStyle(color: col, fontWeight: FontWeight.w600)),
+            ),
+          ...server,
+        ]);
       },
     );
   }
@@ -358,9 +412,9 @@ class _SettingsPageState extends State<SettingsPage> {
             },
           ),
           const SizedBox(height: 20),
-          _notifBlock(),
-          const SizedBox(height: 12),
           _syncBlock(),
+          const SizedBox(height: 12),
+          _notifBlock(),
           const SizedBox(height: 24),
           Text(t('db_title'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
           const SizedBox(height: 6),
