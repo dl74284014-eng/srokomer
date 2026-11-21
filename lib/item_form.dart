@@ -87,17 +87,22 @@ class _ItemFormPageState extends State<ItemFormPage> {
         imageQuality: 78,
       );
 
+  /// Главное фото товара: сохраняем его и сразу берём с него название и описание
+  /// (заменяет старое после подтверждения «Это название?»).
   Future<void> _changePhoto(bool camera) async {
     final x = await _shoot(camera: camera);
-    if (x == null) return;
+    if (x == null || !mounted) return;
     final p = await store.savePhotoFile(x.path);
+    if (!mounted) return;
     setState(() => photo = p);
+    await _ocrName(p);
   }
 
   // ---------- считать название ----------
-  Future<void> _ocrName() async {
-    final x = await _shoot();
-    if (x == null || !mounted) return;
+  /// [givenPath] — уже снятое главное фото; без него открывается камера (кнопка «Считать»).
+  Future<void> _ocrName([String? givenPath]) async {
+    final String? path = givenPath ?? (await _shoot())?.path;
+    if (path == null || !mounted) return;
     // Параллельно: мгновенное распознавание на телефоне + точное через Gemini.
     // Окно «Это название?» показывается сразу и уточняется, когда придёт ответ Gemini.
     final text = ValueNotifier<String?>(null);
@@ -109,7 +114,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
       if (mlDone && gDone) refining.value = false;
     }
 
-    ocrLines(x.path).then((lines) {
+    ocrLines(path).then((lines) {
       final c = nameCandidates(lines);
       alts = [...alts, ...c.where((e) => !alts.contains(e))];
       if (text.value == null && c.isNotEmpty) text.value = c.first;
@@ -118,7 +123,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
       finish();
     });
     var gotGemini = false;
-    geminiRead(x.path).then((g) {
+    geminiRead(path).then((g) {
       if (g != null && g.names.isNotEmpty) {
         gotGemini = true;
         text.value = g.names.first;
@@ -134,7 +139,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
 
     String gCat = 'other';
     String? chosen;
-    final ans = await askLive(context, title: t('is_name_q'), text: text, refining: refining, imagePath: x.path);
+    final ans = await askLive(context, title: t('is_name_q'), text: text, refining: refining, imagePath: path);
     if (!mounted) return;
     if (ans == true) {
       chosen = text.value;
@@ -151,7 +156,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
       return;
     }
     final String picked = chosen;
-    final saved = photo.isEmpty ? await store.savePhotoFile(x.path) : photo;
+    final saved = photo.isEmpty ? await store.savePhotoFile(path) : photo;
     if (!mounted) return;
     setState(() {
       name.text = picked;
