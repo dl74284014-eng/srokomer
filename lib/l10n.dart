@@ -3,7 +3,22 @@ import 'store.dart';
 
 /// Язык интерфейса: 'ru' или 'ko'. Названия товаров всегда хранятся как есть (обычно по-корейски).
 String get lang => store.settings['lang'] ?? 'ru';
-bool get isKo => lang == 'ko';
+bool forceKorean = false; // при выгрузке/отправке — всегда по-корейски
+bool get isKo => forceKorean || lang == 'ko';
+
+/// Выполнить [fn] так, будто интерфейс на корейском (для текста, который отправляем).
+Future<T> inKorean<T>(Future<T> Function() fn) async {
+  final old = forceKorean;
+  forceKorean = true;
+  try {
+    return await fn();
+  } finally {
+    forceKorean = old;
+  }
+}
+
+/// Расположение кнопок: 'center' (по умолчанию), 'left' — для левшей, 'right' — для правшей.
+String get hand => store.settings['hand'] ?? 'center';
 
 String t(String k) => (isKo ? _ko[k] : _ru[k]) ?? _ru[k] ?? k;
 
@@ -188,6 +203,11 @@ const _ru = <String, String>{
   'export_msg': 'Сообщением (KakaoTalk, SMS…)',
   'export_msg_sub': 'Список текстом — выберите KakaoTalk, сообщения или любое приложение',
   'export_txt': 'Текстовый файл (.txt)',
+  'hand_title': 'Расположение кнопок',
+  'hand_center': 'По центру',
+  'hand_left': 'Для левшей',
+  'hand_right': 'Для правшей',
+  'export_ko_note': 'Отправляется на корейском языке',
   'categories': 'Категории',
   'soon_title': 'Скоро заканчивается',
   'all_items': 'Все товары',
@@ -368,6 +388,11 @@ const _ko = <String, String>{
   'export_msg': '메시지로 보내기 (카카오톡, 문자…)',
   'export_msg_sub': '목록을 텍스트로 — 카카오톡, 문자 등 원하는 앱을 선택하세요',
   'export_txt': '텍스트 파일 (.txt)',
+  'hand_title': '버튼 위치',
+  'hand_center': '가운데',
+  'hand_left': '왼손잡이',
+  'hand_right': '오른손잡이',
+  'export_ko_note': '한국어로 보내집니다',
   'categories': '분류',
   'soon_title': '곧 만료',
   'all_items': '전체 상품',

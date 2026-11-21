@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 
 import 'l10n.dart';
 
+MainAxisAlignment get dialogAlign =>
+    hand == 'left' ? MainAxisAlignment.start : (hand == 'right' ? MainAxisAlignment.end : MainAxisAlignment.center);
+
 class InfoNote extends StatelessWidget {
   final String text;
   const InfoNote(this.text, {super.key});
@@ -72,10 +75,16 @@ Future<bool?> askThisOne(BuildContext context,
             ),
         ],
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('no'))),
-        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('yes'))),
-      ],
+      actionsAlignment: dialogAlign,
+      actions: hand == 'left'
+          ? [
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('yes'))),
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('no'))),
+            ]
+          : [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('no'))),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('yes'))),
+            ],
     ),
   );
 }
@@ -218,9 +227,13 @@ Future<bool?> askLive(BuildContext context,
                 Text(t('refined'), style: const TextStyle(color: Color(0xFF2A8A57), fontSize: 13)),
             ],
           ),
+          actionsAlignment: dialogAlign,
           actions: [
+            if (hand == 'left')
+              FilledButton(onPressed: v == null ? null : () => Navigator.pop(ctx, true), child: Text(t('yes'))),
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(v == null ? t('type_myself') : t('no'))),
-            FilledButton(onPressed: v == null ? null : () => Navigator.pop(ctx, true), child: Text(t('yes'))),
+            if (hand != 'left')
+              FilledButton(onPressed: v == null ? null : () => Navigator.pop(ctx, true), child: Text(t('yes'))),
           ],
         );
       },

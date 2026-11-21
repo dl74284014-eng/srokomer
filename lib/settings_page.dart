@@ -412,6 +412,22 @@ class _SettingsPageState extends State<SettingsPage> {
             },
           ),
           const SizedBox(height: 20),
+          Text(t('hand_title'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          const SizedBox(height: 8),
+          SegmentedButton<String>(
+            segments: [
+              ButtonSegment(value: 'left', label: Text(t('hand_left'))),
+              ButtonSegment(value: 'center', label: Text(t('hand_center'))),
+              ButtonSegment(value: 'right', label: Text(t('hand_right'))),
+            ],
+            selected: {hand},
+            onSelectionChanged: (v) async {
+              await store.setSetting('hand', v.first);
+              store.notify();
+              if (mounted) setState(() {});
+            },
+          ),
+          const SizedBox(height: 20),
           _syncBlock(),
           const SizedBox(height: 12),
           _notifBlock(),

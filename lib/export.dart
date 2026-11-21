@@ -252,6 +252,7 @@ Future<void> showExportSheet(BuildContext context) async {
           Text(t('export_title'), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
           const SizedBox(height: 4),
           Text(t('export_sub'), style: const TextStyle(color: Colors.black54)),
+          Text('🇰🇷 ${t('export_ko_note')}', style: const TextStyle(color: Color(0xFF2A8A57), fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           opt(ctx, 'msg', const Color(0xFFFEE500), '💬', t('export_msg'), sub: t('export_msg_sub')),
           opt(ctx, 'pdf', const Color(0xFFD93025), 'PDF', 'PDF (.pdf)'),
@@ -265,26 +266,27 @@ Future<void> showExportSheet(BuildContext context) async {
   if (kind == null) return;
   try {
     if (kind == 'msg') {
-      await Share.share(buildText(), subject: t('export_doc_title'));
+      final text = await inKorean(() async => buildText());
+      await Share.share(text, subject: '유통기한 목록');
       return;
     }
     final File f;
     final String mime;
     switch (kind) {
       case 'xlsx':
-        f = await buildXlsx();
+        f = await inKorean(buildXlsx);
         mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       case 'docx':
-        f = await buildDocx();
+        f = await inKorean(buildDocx);
         mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
       case 'pdf':
-        f = await buildPdf();
+        f = await inKorean(buildPdf);
         mime = 'application/pdf';
       default:
-        f = await buildTxt();
+        f = await inKorean(buildTxt);
         mime = 'text/plain';
     }
-    await Share.shareXFiles([XFile(f.path, mimeType: mime)], subject: t('export_doc_title'));
+    await Share.shareXFiles([XFile(f.path, mimeType: mime)], subject: '유통기한 목록');
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));

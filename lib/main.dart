@@ -219,38 +219,50 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         onRefresh: syncer.syncNow,
         child: ListenableBuilder(listenable: store, builder: (context, _) => _body()),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
-          child: Row(children: [
-            Expanded(
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: brand,
-                  minimumSize: const Size.fromHeight(60),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                ),
-                onPressed: _scan,
-                icon: const Icon(Icons.qr_code_scanner, size: 28),
-                label: Text(t('scan_big'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-              ),
-            ),
-            const SizedBox(width: 10),
-            SizedBox(
-              width: 60,
-              height: 60,
-              child: IconButton.filledTonal(
-                tooltip: t('add_manual'),
-                style: IconButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))),
-                onPressed: () => openItemForm(context, Item(id: newId())),
-                icon: const Icon(Icons.add, size: 30),
-              ),
-            ),
-          ]),
-        ),
+      bottomNavigationBar: SafeArea(child: _bottomBar()),
+    );
+  }
+
+  /// Нижние кнопки: по центру / для левшей / для правшей (⚙️ Настройки).
+  Widget _bottomBar() {
+    final scan = FilledButton.icon(
+      style: FilledButton.styleFrom(
+        backgroundColor: brand,
+        minimumSize: const Size.fromHeight(62),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+      onPressed: _scan,
+      icon: const Icon(Icons.qr_code_scanner, size: 28),
+      label: Text(t('scan_big'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+    );
+    final add = SizedBox(
+      width: 62,
+      height: 62,
+      child: IconButton.filledTonal(
+        tooltip: t('add_manual'),
+        style: IconButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
+        onPressed: () => openItemForm(context, Item(id: newId())),
+        icon: const Icon(Icons.add, size: 30),
       ),
     );
+    if (hand == 'center') {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(14, 6, 14, 8),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          scan,
+          TextButton.icon(
+            onPressed: () => openItemForm(context, Item(id: newId())),
+            icon: const Icon(Icons.add),
+            label: Text(t('add_manual'), style: const TextStyle(fontSize: 15)),
+          ),
+        ]),
+      );
+    }
+    // левша: главная кнопка ближе к левому большому пальцу, «＋» справа; правша — наоборот
+    final row = hand == 'left'
+        ? [Expanded(child: scan), const SizedBox(width: 10), add]
+        : [add, const SizedBox(width: 10), Expanded(child: scan)];
+    return Padding(padding: const EdgeInsets.fromLTRB(14, 6, 14, 10), child: Row(children: row));
   }
 
   Widget _body() {

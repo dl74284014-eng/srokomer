@@ -26,13 +26,13 @@ class SyncService extends ChangeNotifier {
   void attach() {
     store.onLocalChange = () {
       _debounce?.cancel();
-      _debounce = Timer(const Duration(seconds: 2), syncNow);
+      _debounce = Timer(const Duration(milliseconds: 300), syncNow);
     };
   }
 
   void startPeriodic() {
     _periodic?.cancel();
-    _periodic = Timer.periodic(const Duration(seconds: 20), (_) => syncNow());
+    _periodic = Timer.periodic(const Duration(seconds: 4), (_) => syncNow(quiet: true));
   }
 
   void stopPeriodic() {
@@ -56,15 +56,17 @@ class SyncService extends ChangeNotifier {
     return base.replace(path: '/storage/v1/object/photos/$name');
   }
 
-  Future<void> syncNow() async {
+  /// quiet — фоновая проверка каждые 4 секунды: без мигающего значка.
+  Future<void> syncNow({bool quiet = false}) async {
     if (!enabled) return;
     if (running) {
       _again = true;
       return;
     }
     running = true;
+    final hadError = error != null;
     error = null;
-    notifyListeners();
+    if (!quiet) notifyListeners();
     try {
       final tk = await auth.accessToken();
       if (tk == null) throw 'login';
@@ -77,7 +79,7 @@ class SyncService extends ChangeNotifier {
       debugPrint('syncer error $e');
     } finally {
       running = false;
-      notifyListeners();
+      if (!quiet || hadError || error != null) notifyListeners();
     }
     if (_again) {
       _again = false;
@@ -217,7 +219,11 @@ class SyncService extends ChangeNotifier {
       }
       changed = true;
     }
-    if (rows.isNotEmpty) store.settings['syncSinceItems'] = rows.last['synced_at'].toString();
+    var sinceChanged = false;
+    if (rows.isNotEmpty && store.settings['syncSinceItems'] != rows.last['synced_at'].toString()) {
+      store.settings['syncSinceItems'] = rows.last['synced_at'].toString();
+      sinceChanged = true;
+    }
 
     final prows = await _fetch('products', 'syncSinceProducts');
     for (final row in prows) {
@@ -236,9 +242,12 @@ class SyncService extends ChangeNotifier {
       store.products[code] = p;
       changed = true;
     }
-    if (prows.isNotEmpty) store.settings['syncSinceProducts'] = prows.last['synced_at'].toString();
+    if (prows.isNotEmpty && store.settings['syncSinceProducts'] != prows.last['synced_at'].toString()) {
+      store.settings['syncSinceProducts'] = prows.last['synced_at'].toString();
+      sinceChanged = true;
+    }
 
-    await store.save();
+    if (changed || sinceChanged) await store.save();
     if (changed) store.notify();
   }
 
