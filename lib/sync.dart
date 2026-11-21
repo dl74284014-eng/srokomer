@@ -240,10 +240,7 @@ class SyncService extends ChangeNotifier {
           continue;
         }
         final rem = store.items[i].photoRemote;
-        if (!_triedPhotos.add(rem)) {
-          _needPhotos.remove(id);
-          continue;
-        }
+        if (!_triedPhotos.add(rem)) continue; // уже пробовали — повторим при следующем запуске приложения
         final path = await _localPhotoFor(rem);
         if (path.isNotEmpty) {
           final j = store.items.indexWhere((e) => e.id == id);
@@ -339,11 +336,22 @@ class SyncService extends ChangeNotifier {
       final remote = Item.fromJson(Map<String, dynamic>.from(row['data'] as Map));
       remote.id = id;
       remote.updatedAt = ts;
-      if (i >= 0 && store.items[i].photoRemote == remote.photoRemote && store.items[i].photo.isNotEmpty) {
-        remote.photo = store.items[i].photo;
+      // Фото на этом телефоне никогда не теряем из-за версии из облака без фото.
+      final old = i >= 0 ? store.items[i] : null;
+      final oldHas = old != null && old.photo.isNotEmpty && File(old.photo).existsSync();
+      if (oldHas && (remote.photoRemote.isEmpty || remote.photoRemote == old.photoRemote)) {
+        remote.photo = old.photo;
+        if (remote.photoRemote.isEmpty) {
+          remote.photoRemote = old.photoRemote;
+          if (remote.photoRemote.isEmpty) _photoUpItems.add(id); // дошлём своё фото в облако
+          store.dirtyItems.add(id); // и вернём ссылку на фото в облачную версию
+        }
       } else {
         remote.photo = _existingLocal(remote.photoRemote);
-        if (remote.photo.isEmpty && remote.photoRemote.isNotEmpty) _needPhotos.add(id);
+        if (remote.photo.isEmpty) {
+          if (oldHas) remote.photo = old.photo; // старое фото остаётся, пока не скачается новое
+          if (remote.photoRemote.isNotEmpty) _needPhotos.add(id);
+        }
       }
       if (i >= 0) {
         store.items[i] = remote;
@@ -367,11 +375,20 @@ class SyncService extends ChangeNotifier {
       if (old != null && old.updatedAt >= ts) continue;
       final p = Product.fromJson(Map<String, dynamic>.from(row['data'] as Map));
       p.updatedAt = ts;
-      if (old != null && old.photoRemote == p.photoRemote && old.photo.isNotEmpty) {
+      final oldHas = old != null && old.photo.isNotEmpty && File(old.photo).existsSync();
+      if (oldHas && (p.photoRemote.isEmpty || p.photoRemote == old.photoRemote)) {
         p.photo = old.photo;
+        if (p.photoRemote.isEmpty) {
+          p.photoRemote = old.photoRemote;
+          if (p.photoRemote.isEmpty) _photoUpProducts.add(code);
+          store.dirtyProducts.add(code);
+        }
       } else {
         p.photo = _existingLocal(p.photoRemote);
-        if (p.photo.isEmpty && p.photoRemote.isNotEmpty) _needProductPhotos.add(code);
+        if (p.photo.isEmpty) {
+          if (oldHas) p.photo = old.photo;
+          if (p.photoRemote.isNotEmpty) _needProductPhotos.add(code);
+        }
       }
       store.products[code] = p;
       changed = true;
