@@ -27,9 +27,25 @@ class Store extends ChangeNotifier {
     dir = await getApplicationDocumentsDirectory();
     photoDir = Directory('${dir.path}/photos');
     if (!await photoDir.exists()) await photoDir.create(recursive: true);
+    Map<String, dynamic>? j;
+    for (final f in [_file, File('${_file.path}.bak')]) {
+      try {
+        if (await f.exists()) {
+          j = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
+          break;
+        }
+      } catch (e) {
+        debugPrint('broken ${f.path}: $e'); // пробуем резервную копию
+      }
+    }
+    if (j == null && await _file.exists()) {
+      // файл не читается: сохраняем его копию, чтобы ничего не потерять навсегда
+      try {
+        await _file.copy('${_file.path}.broken-${DateTime.now().millisecondsSinceEpoch}');
+      } catch (_) {}
+    }
     try {
-      if (await _file.exists()) {
-        final j = jsonDecode(await _file.readAsString()) as Map<String, dynamic>;
+      if (j != null) {
         items = ((j['items'] as List?) ?? [])
             .map((e) => Item.fromJson(Map<String, dynamic>.from(e as Map)))
             .toList();
@@ -73,16 +89,36 @@ class Store extends ChangeNotifier {
     return '${part()}-${part()}-${part()}';
   }
 
-  Future<void> save() async {
-    final tmp = File('${_file.path}.tmp');
-    await tmp.writeAsString(jsonEncode({
+  // Сохранения выполняются строго по очереди: раньше одновременная запись (синхронизация + правка)
+  // могла испортить файл, и при следующем запуске терялись ссылки на фото.
+  Future<void> _saving = Future.value();
+  int _saveSeq = 0;
+
+  Future<void> save() {
+    _saving = _saving.then((_) => _doSave()).catchError((e) => debugPrint('save error $e'));
+    return _saving;
+  }
+
+  Future<void> _doSave() async {
+    final data = jsonEncode({
       'items': items.map((e) => e.toJson()).toList(),
       'products': products.map((k, v) => MapEntry(k, v.toJson())),
       'settings': settings,
       'tombstones': tombstones,
       'dirtyItems': dirtyItems.toList(),
       'dirtyProducts': dirtyProducts.toList(),
-    }));
+    });
+    final tmp = File('${_file.path}.${++_saveSeq}.tmp');
+    await tmp.writeAsString(data, flush: true);
+    if (await _file.exists()) {
+      // резервная копия последнего исправного файла + копия раз в день
+      try {
+        await _file.copy('${_file.path}.bak');
+        final day = DateTime.now().toIso8601String().substring(0, 10);
+        final daily = File('${_file.path}.$day.bak');
+        if (!await daily.exists()) await _file.copy(daily.path);
+      } catch (_) {}
+    }
     await tmp.rename(_file.path);
   }
 
@@ -173,8 +209,9 @@ class Store extends ChangeNotifier {
     await save();
   }
 
-  Future<String> savePhotoFile(String srcPath) async {
-    final dst = '${photoDir.path}/${newId()}.jpg';
+  /// [itemId] попадает в имя файла: даже если данные испортятся, фото найдётся по товару.
+  Future<String> savePhotoFile(String srcPath, {String? itemId}) async {
+    final dst = '${photoDir.path}/${itemId != null ? '${itemId}__' : ''}${newId()}.jpg';
     await File(srcPath).copy(dst);
     return dst;
   }

@@ -6,6 +6,7 @@ import 'gemini.dart';
 import 'lookup.dart';
 import 'models.dart';
 import 'notify.dart';
+import 'photo_fix.dart';
 import 'auth.dart';
 import 'store.dart';
 import 'sync.dart';
@@ -496,26 +497,13 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 10),
           FilledButton.tonalIcon(
             onPressed: () async {
-              final prog = ValueNotifier<String>('…');
-              showDialog<void>(
-                context: context,
-                barrierDismissible: false,
-                builder: (_) => AlertDialog(
-                  content: Row(children: [
-                    const SizedBox(width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 3)),
-                    const SizedBox(width: 14),
-                    Expanded(child: ValueListenableBuilder<String>(valueListenable: prog, builder: (_, v, __) => Text(v))),
-                  ]),
-                ),
-              );
-              final n = await fillMissingPhotos((d, tot) => prog.value = '${t('photo_searching')} $d / $tot');
+              final r = await withLoading(context, t('photo_fixing'), () => fixPhotos(removeWeb: true));
               if (!mounted) return;
-              Navigator.of(context, rootNavigator: true).pop();
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('${t('photo_found_n')}: $n${lastImageError.isNotEmpty && n == 0 ? '\n$lastImageError' : ''}')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(tf('photo_fix_done', {'r': r.$2, 'w': r.$1}))));
             },
-            icon: const Icon(Icons.image_search),
-            label: Text(t('photo_fill_all')),
+            icon: const Icon(Icons.restore),
+            label: Text(t('photo_restore')),
           ),
           const SizedBox(height: 10),
           _keyBlock(

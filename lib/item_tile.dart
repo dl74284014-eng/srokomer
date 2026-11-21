@@ -129,7 +129,6 @@ Future<void> showItemActions(BuildContext context, Item it) async {
           const Divider(height: 1),
           tile('edit', Icons.edit_outlined, t('act_edit')),
           tile('date', Icons.event_outlined, t('act_date')),
-          tile('photo', Icons.image_search, t('photo_web')),
           if (it.qty > 1) tile('minus', Icons.remove_circle_outline, t('act_minus')),
           tile('delete', Icons.delete_outline, t('delete'), color: const Color(0xFFD6363B)),
           const SizedBox(height: 8),
@@ -152,14 +151,6 @@ Future<void> showItemActions(BuildContext context, Item it) async {
       );
       if (d != null) {
         final n = Item.fromJson(it.toJson())..expiry = isoOf(d);
-        await store.upsertItem(n);
-      }
-    case 'photo':
-      final p = await pickWebPhoto(context, it.name);
-      if (p != null) {
-        final n = Item.fromJson(it.toJson())
-          ..photo = p
-          ..photoRemote = '';
         await store.upsertItem(n);
       }
     case 'minus':

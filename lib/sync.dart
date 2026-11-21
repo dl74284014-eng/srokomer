@@ -271,6 +271,46 @@ class SyncService extends ChangeNotifier {
     }
   }
 
+  /// Все фото этого аккаунта в облаке: (путь, время загрузки мс).
+  Future<List<(String, int)>> listCloudPhotos() async {
+    final out = <(String, int)>[];
+    final tk = await auth.accessToken();
+    if (tk == null) return out;
+    _token = tk;
+    final base = Uri.parse(store.supaUrl);
+    for (var offset = 0; offset < 20000; offset += 1000) {
+      final r = await http
+          .post(base.replace(path: '/storage/v1/object/list/photos'),
+              headers: _h,
+              body: jsonEncode({
+                'prefix': '${auth.uid}/',
+                'limit': 1000,
+                'offset': offset,
+                'sortBy': {'column': 'created_at', 'order': 'asc'}
+              }))
+          .timeout(const Duration(seconds: 30));
+      if (r.statusCode >= 300) break;
+      final list = jsonDecode(utf8.decode(r.bodyBytes));
+      if (list is! List || list.isEmpty) break;
+      for (final o in list) {
+        if (o is! Map || o['name'] == null || o['id'] == null) continue; // папки пропускаем
+        final ts = DateTime.tryParse((o['created_at'] ?? '').toString())?.millisecondsSinceEpoch ?? 0;
+        out.add(('${auth.uid}/${o['name']}', ts));
+      }
+      if (list.length < 1000) break;
+    }
+    return out;
+  }
+
+  /// Скачать фото из облака (без ограничений на повтор). '' — не удалось.
+  Future<String> fetchCloudPhoto(String remote) async {
+    final tk = await auth.accessToken();
+    if (tk == null) return '';
+    _token = tk;
+    _triedPhotos.remove(remote);
+    return _localPhotoFor(remote);
+  }
+
   /// Сколько товаров лежит в облаке (для проверки).
   Future<int?> cloudCount() async {
     try {

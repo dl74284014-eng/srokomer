@@ -8,6 +8,7 @@ import 'list_page.dart';
 import 'lookup.dart';
 import 'models.dart';
 import 'notify.dart';
+import 'photo_fix.dart';
 import 'scanner_page.dart';
 import 'settings_page.dart';
 import 'auth.dart';
@@ -87,7 +88,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     syncer.syncNow();
     syncer.startPeriodic();
     if (notifier.on) notifier.requestPermission();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeUpdate());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Один раз: убрать фото из интернета и вернуть потерянные свои фото
+      {
+        final first = store.settings['photoFix2'] != '1';
+        // ждём первую синхронизацию, чтобы искать фото и в облаке
+        await syncer.syncNow();
+        final r = await fixPhotos(removeWeb: first);
+        if (first) await store.setSetting('photoFix2', '1');
+        if (mounted && (r.$1 > 0 || r.$2 > 0)) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              duration: const Duration(seconds: 6), content: Text(tf('photo_fix_done', {'r': r.$2, 'w': r.$1}))));
+        }
+      }
+      _maybeUpdate();
+    });
   }
 
   DateTime? _lastUpdCheck;

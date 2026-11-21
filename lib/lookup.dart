@@ -28,11 +28,7 @@ Future<LookupResult?> lookupBarcode(String code, {String mfdsKey = '', String ka
   }
   r ??= await _off(code);
   if (r == null && kakaoKey.isNotEmpty) r = await _kakaoGuess(kakaoKey, code);
-  if (r != null && r.imageUrl.isEmpty && kakaoKey.isNotEmpty) {
-    final imgs = await kakaoImages(kakaoKey, r.name, size: 3);
-    // несколько вариантов подряд — download() возьмёт первый, который скачается
-    r.imageUrl = imgs.map((e) => e.both).join('\n');
-  }
+  if (r != null) r.imageUrl = ''; // фото из интернета не используем — только свои снимки
   return r;
 }
 

@@ -96,7 +96,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
   Future<void> _changePhoto(bool camera) async {
     final x = await _shoot(camera: camera);
     if (x == null || !mounted) return;
-    final p = await store.savePhotoFile(x.path);
+    final p = await store.savePhotoFile(x.path, itemId: widget.item.id);
     if (!mounted) return;
     setState(() => photo = p);
     await _ocrName(p);
@@ -156,7 +156,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
       _snack('${t('valid_until')}: ${fmtDate(gExp)} ✓');
     }
     // Снятое фото оставляем у товара, даже если название не подошло (раньше оно терялось)
-    final saved = photo.isEmpty ? await store.savePhotoFile(path) : photo;
+    final saved = photo.isEmpty ? await store.savePhotoFile(path, itemId: widget.item.id) : photo;
     if (!mounted) return;
     if (photo.isEmpty) setState(() => photo = saved);
     if (chosen == null || chosen.isEmpty) {
@@ -362,15 +362,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
               ),
             ),
           ]),
-          const SizedBox(height: 6),
-          OutlinedButton.icon(
-            onPressed: () async {
-              final p = await pickWebPhoto(context, name.text);
-              if (p != null && mounted) setState(() => photo = p);
-            },
-            icon: const Icon(Icons.image_search),
-            label: Text(t('photo_web')),
-          ),
+
           gap,
           // название
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
