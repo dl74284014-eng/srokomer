@@ -13,6 +13,7 @@ import 'settings_page.dart';
 import 'auth.dart';
 import 'store.dart';
 import 'sync.dart';
+import 'updater.dart';
 import 'widgets.dart';
 
 Future<void> main() async {
@@ -70,6 +71,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     syncer.syncNow();
     syncer.startPeriodic();
     if (notifier.on) notifier.requestPermission();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeUpdate());
+  }
+
+  DateTime? _lastUpdCheck;
+  Future<void> _maybeUpdate() async {
+    final now = DateTime.now();
+    if (_lastUpdCheck != null && now.difference(_lastUpdCheck!).inMinutes < 30) return;
+    _lastUpdCheck = now;
+    await offerUpdate(context);
   }
 
   @override
@@ -89,6 +99,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       notifier.reschedule(); // пересчитать «осталось N дней»
+      _maybeUpdate();
       syncer.syncNow();
       syncer.startPeriodic();
     } else if (state == AppLifecycleState.paused) {
@@ -312,6 +323,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           _stat(red + orange + yellow, t('le7'), Urg.yellow, () => _open(ListPage(urg: Urg.yellow, title: t('week_list')))),
         ]),
         const SizedBox(height: 12),
+        // ---- последний отсканированный ----
+        if (_lastScanned() != null) ...[
+          Text(t('last_scanned'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black54)),
+          const SizedBox(height: 6),
+          ItemTile(_lastScanned()!, key: const ValueKey('last-scanned')),
+          const SizedBox(height: 4),
+        ],
         // ---- поиск ----
         GestureDetector(
           onTap: () => _open(ListPage(title: t('all_items'), focusSearch: true)),
@@ -347,6 +365,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ],
       ],
     );
+  }
+
+  /// Последний отсканированный товар (со штрих-кодом, самый свежий; синхронизируется между телефонами).
+  Item? _lastScanned() {
+    Item? best;
+    for (final it in store.items) {
+      if (it.barcode.isEmpty) continue;
+      if (best == null || it.updatedAt > best.updatedAt) best = it;
+    }
+    return best;
   }
 
   Widget _note(String text) => Container(

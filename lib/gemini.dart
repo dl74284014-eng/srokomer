@@ -18,8 +18,20 @@ class GeminiResult {
   GeminiResult(this.names, this.category, this.expiry, this.rawDate);
 }
 
-// Быстрые модели без «размышлений» — ответ за 1–3 секунды
-const _models = ['gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];
+// Варианты (модель + настройки) от самого быстрого. Первый сработавший запоминается,
+// чтобы в следующий раз не тратить время на неподходящие.
+const _variants = <(String, Map<String, Object>?)>[
+  ('gemini-flash-lite-latest', {'thinkingBudget': 0}),
+  ('gemini-flash-lite-latest', {'thinkingLevel': 'minimal'}),
+  ('gemini-2.5-flash-lite', {'thinkingBudget': 0}),
+  ('gemini-flash-lite-latest', null),
+  ('gemini-flash-latest', {'thinkingLevel': 'minimal'}),
+  ('gemini-flash-latest', {'thinkingBudget': 0}),
+  ('gemini-flash-latest', null),
+];
+
+/// Сколько длился последний ответ Gemini (мс) — показывается в окне распознавания.
+int lastGeminiMs = 0;
 
 String _prompt() {
   final now = DateTime.now();
@@ -39,37 +51,52 @@ final cats_ = cats.map((c) => c.k).toList();
 
 /// null — ключа нет или не удалось (тогда используется ML Kit).
 Future<GeminiResult?> geminiRead(String imagePath) async {
+  lastGeminiMs = 0;
   final key = store.geminiKey;
   if (key.isEmpty) return null;
-  final bytes = await File(imagePath).readAsBytes();
-  final body = jsonEncode({
-    'contents': [
-      {
-        'parts': [
-          {'text': _prompt()},
-          {
-            'inline_data': {'mime_type': 'image/jpeg', 'data': base64Encode(bytes)}
-          },
-        ]
-      }
-    ],
-    'generationConfig': {'temperature': 0, 'maxOutputTokens': 200, 'responseMimeType': 'application/json'},
-  });
-  for (final m in _models) {
+  final sw = Stopwatch()..start();
+  final b64 = base64Encode(await File(imagePath).readAsBytes());
+  final start = int.tryParse(store.settings['gemVariant'] ?? '') ?? 0;
+  for (var k = 0; k < _variants.length; k++) {
+    final idx = (start + k) % _variants.length;
+    final (model, thinking) = _variants[idx];
+    final body = jsonEncode({
+      'contents': [
+        {
+          'parts': [
+            {'text': _prompt()},
+            {
+              'inline_data': {'mime_type': 'image/jpeg', 'data': b64}
+            },
+          ]
+        }
+      ],
+      'generationConfig': {
+        'temperature': 0,
+        'maxOutputTokens': 160,
+        'responseMimeType': 'application/json',
+        if (thinking != null) 'thinkingConfig': thinking,
+      },
+    });
     try {
       final r = await _client
           .post(
-            Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent'),
+            Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent'),
             headers: {'x-goog-api-key': key, 'Content-Type': 'application/json'},
             body: body,
           )
           .timeout(const Duration(seconds: 15));
-      if (r.statusCode == 404) continue; // модель недоступна — пробуем следующую
+      // 400/404 — эта модель или настройка не подходит: следующий вариант
+      if (r.statusCode == 400 || r.statusCode == 404) continue;
       if (r.statusCode != 200) return null;
+      if (idx != start) {
+        store.settings['gemVariant'] = '$idx';
+        store.save();
+      }
       final j = jsonDecode(utf8.decode(r.bodyBytes));
       final parts = j['candidates']?[0]?['content']?['parts'];
       if (parts is! List) return null;
-      final text = parts.map((p) => (p is Map ? (p['text'] ?? '') : '').toString()).join();
+      final text = parts.map((p) => (p is Map && p['thought'] != true ? (p['text'] ?? '') : '').toString()).join();
       final mm = RegExp(r'\{[\s\S]*\}').firstMatch(text);
       if (mm == null) return null;
       final o = jsonDecode(mm.group(0)!) as Map;
@@ -78,10 +105,10 @@ Future<GeminiResult?> geminiRead(String imagePath) async {
           .where((e) => e.isNotEmpty)
           .toSet()
           .toList();
-      const cat = 'other';
       var exp = (o['expiry'] ?? '').toString().trim();
       if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(exp) || parseIso(exp) == null) exp = '';
-      return GeminiResult(names, cat, exp, (o['expiry_raw'] ?? '').toString());
+      lastGeminiMs = sw.elapsedMilliseconds;
+      return GeminiResult(names, 'other', exp, (o['expiry_raw'] ?? '').toString());
     } catch (_) {
       return null;
     }

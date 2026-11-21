@@ -9,6 +9,7 @@ import 'notify.dart';
 import 'auth.dart';
 import 'store.dart';
 import 'sync.dart';
+import 'updater.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -466,6 +467,15 @@ class _SettingsPageState extends State<SettingsPage> {
             settingKey: 'geminiKey',
           ),
           const SizedBox(height: 20),
+          Row(children: [
+            Expanded(child: Text('${t('version')}: $buildName', style: const TextStyle(color: Colors.black54))),
+            FilledButton.tonalIcon(
+              onPressed: () => offerUpdate(context, manual: true),
+              icon: const Icon(Icons.system_update),
+              label: Text(t('upd_check')),
+            ),
+          ]),
+          const SizedBox(height: 12),
           Text(t('about_data'), style: const TextStyle(color: Colors.black45)),
         ],
       ),

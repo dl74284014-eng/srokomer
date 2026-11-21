@@ -20,6 +20,7 @@ dependencies:
   archive: any
   share_plus: ^10.1.4
   pdf: ^3.11.1
+  open_filex: ^4.7.0
   flutter_local_notifications: ^18.0.1
   timezone: ^0.10.0
 

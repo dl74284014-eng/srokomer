@@ -82,9 +82,9 @@ class _ItemFormPageState extends State<ItemFormPage> {
 
   Future<XFile?> _shoot({bool camera = true}) => picker.pickImage(
         source: camera ? ImageSource.camera : ImageSource.gallery,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 82,
+        maxWidth: 1024, // меньше фото — быстрее отправка и ответ Gemini, текст названия читается
+        maxHeight: 1024,
+        imageQuality: 78,
       );
 
   Future<void> _changePhoto(bool camera) async {

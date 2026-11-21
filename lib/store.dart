@@ -145,6 +145,13 @@ class Store extends ChangeNotifier {
     return (k.isNotEmpty ? k : _defaultGeminiKey).trim();
   }
 
+  // Токен GitHub (только чтение этого репозитория) — для автообновления приложения
+  static const _defaultGhToken = '';
+  String get ghToken {
+    final k = settings['ghToken'] ?? '';
+    return (k.isNotEmpty ? k : _defaultGhToken).trim();
+  }
+
   // Облако синхронизации (Supabase). Значения по умолчанию встраиваются в сборку.
   static const _defaultSupaUrl = 'https://xmcsewifdsgksywxrnmc.supabase.co';
   static const _defaultSupaKey = 'sb_publishable_ruycDQwapaCfIWnHBXOUwg_iByjJTdR';

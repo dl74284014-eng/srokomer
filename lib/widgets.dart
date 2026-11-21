@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'gemini.dart';
 import 'l10n.dart';
 
 MainAxisAlignment get dialogAlign =>
@@ -224,7 +225,8 @@ Future<bool?> askLive(BuildContext context,
                   Expanded(child: Text(t('refining'), style: const TextStyle(color: Colors.black54, fontSize: 13))),
                 ])
               else if (v != null)
-                Text(t('refined'), style: const TextStyle(color: Color(0xFF2A8A57), fontSize: 13)),
+                Text('${t('refined')}${lastGeminiMs > 0 ? ' · ${(lastGeminiMs / 1000).toStringAsFixed(1)} s' : ''}',
+                    style: const TextStyle(color: Color(0xFF2A8A57), fontSize: 13)),
             ],
           ),
           actionsAlignment: dialogAlign,
