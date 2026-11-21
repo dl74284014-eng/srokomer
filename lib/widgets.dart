@@ -19,10 +19,10 @@ class InfoNote extends StatelessWidget {
         margin: const EdgeInsets.only(top: 8, bottom: 8),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: const Color(0xFFE3F2EA),
+          color: P.note,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Text(text, style: const TextStyle(color: Color(0xFF0F5C39), fontSize: 13.5)),
+        child: Text(text, style: TextStyle(color: P.noteText, fontSize: 13.5)),
       );
 }
 
@@ -66,7 +66,7 @@ Future<bool?> askThisOne(BuildContext context,
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 height: 160,
-                color: const Color(0xFFF1EEE7),
+                color: P.photoBg,
                 child: Image.file(File(imagePath), fit: BoxFit.contain),
               ),
             ),
@@ -75,7 +75,7 @@ Future<bool?> askThisOne(BuildContext context,
           if (sub.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text(sub, style: TextStyle(color: Colors.grey.shade700)),
+              child: Text(sub, style: TextStyle(color: P.muted)),
             ),
         ],
       ),
@@ -211,7 +211,7 @@ Future<bool?> askLive(BuildContext context,
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     height: 150,
-                    color: const Color(0xFFF1EEE7),
+                    color: P.photoBg,
                     child: Image.file(File(imagePath), fit: BoxFit.contain, cacheWidth: 600),
                   ),
                 ),
@@ -219,13 +219,13 @@ Future<bool?> askLive(BuildContext context,
               if (v != null)
                 Text(v, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800))
               else if (!busy)
-                Text(t('no_text'), style: const TextStyle(color: Colors.black54)),
+                Text(t('no_text'), style: TextStyle(color: P.muted)),
               const SizedBox(height: 8),
               if (busy)
                 Row(children: [
                   const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(t('refining'), style: const TextStyle(color: Colors.black54, fontSize: 13))),
+                  Expanded(child: Text(t('refining'), style: TextStyle(color: P.muted, fontSize: 13))),
                 ])
               else if (v != null)
                 Text('${t('refined')}${lastGeminiMs > 0 ? ' · ${(lastGeminiMs / 1000).toStringAsFixed(1)} s' : ''}',
@@ -279,7 +279,7 @@ Future<String?> pickWebPhoto(BuildContext context, String name) async {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: Container(
-                        color: const Color(0xFFF1EEE7),
+                        color: P.photoBg,
                         child: Image.network(im.thumb,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image_outlined))),

@@ -161,6 +161,23 @@ String plural(int n, String a, String b, String c) {
   return c;
 }
 
+// ---------- цвета светлой и тёмной темы ----------
+bool darkMode = false; // выставляется при построении приложения
+
+class P {
+  static Color get bg => darkMode ? const Color(0xFF000000) : const Color(0xFFF4F1EA);
+  static Color get card => darkMode ? const Color(0xFF141614) : Colors.white;
+  static Color get muted => darkMode ? Colors.white60 : Colors.black54;
+  static Color get faint => darkMode ? Colors.white38 : Colors.black45;
+  static Color get strong => darkMode ? Colors.white : Colors.black87;
+  static Color get dim => darkMode ? Colors.white24 : Colors.black26;
+  static Color get thumb => darkMode ? const Color(0xFF222422) : const Color(0xFFEEEEEE);
+  static Color get photoBg => darkMode ? const Color(0xFF1A1C1A) : const Color(0xFFE9E5DC);
+  static Color get note => darkMode ? const Color(0xFF10261A) : const Color(0xFFE3F2EA);
+  static Color get noteText => darkMode ? const Color(0xFF9EE0BC) : const Color(0xFF0F5C39);
+  static Color get warn => darkMode ? const Color(0xFF3A2610) : const Color(0xFFFFF0E0);
+}
+
 enum Urg { red, orange, yellow, green, none }
 
 Urg urgency(int? dl) {
@@ -187,6 +204,7 @@ Color urgColor(Urg u) {
 }
 
 Color urgSoft(Urg u) {
+  if (darkMode) return urgColor(u).withValues(alpha: 0.22);
   switch (u) {
     case Urg.red:
       return const Color(0xFFFDE8E8);

@@ -336,7 +336,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
             borderRadius: BorderRadius.circular(16),
             child: Container(
               height: 190,
-              color: const Color(0xFFE9E5DC),
+              color: P.photoBg,
               child: photo.isNotEmpty && File(photo).existsSync()
                   ? Image.file(File(photo), fit: BoxFit.contain)
                   : const Center(child: Text('📦', style: TextStyle(fontSize: 56))),
@@ -411,7 +411,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
           gap,
           // срок
           Text(t('exp_title'),
-              style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600)),
+              style: TextStyle(color: P.muted, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           Row(children: [
             Expanded(
@@ -453,7 +453,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade400),
+                border: Border.all(color: P.dim),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Row(mainAxisSize: MainAxisSize.min, children: [

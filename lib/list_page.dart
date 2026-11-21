@@ -88,7 +88,7 @@ class _ListPageState extends State<ListPage> {
                   hintText: t('search'),
                   prefixIcon: const Icon(Icons.search),
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: P.card,
                   isDense: true,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
@@ -96,14 +96,14 @@ class _ListPageState extends State<ListPage> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
                 child: Text('${t('sort')}: ${t('sort_$sort')} · ${items.length} ${t('pcs')}',
-                    style: const TextStyle(color: Colors.black54, fontSize: 13)),
+                    style: TextStyle(color: P.muted, fontSize: 13)),
               ),
               if (items.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 60),
                   child: Center(
                     child: Text(q.isEmpty ? t('empty_cat') : t('nothing'),
-                        style: const TextStyle(color: Colors.black54, fontSize: 16)),
+                        style: TextStyle(color: P.muted, fontSize: 16)),
                   ),
                 ),
               ...items.map((it) => ItemTile(it, key: ValueKey(it.id))),
@@ -111,7 +111,7 @@ class _ListPageState extends State<ListPage> {
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(t('hold_hint'),
-                      textAlign: TextAlign.center, style: const TextStyle(color: Colors.black45, fontSize: 12.5)),
+                      textAlign: TextAlign.center, style: TextStyle(color: P.faint, fontSize: 12.5)),
                 ),
             ],
           );

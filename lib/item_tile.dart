@@ -26,7 +26,7 @@ Widget itemThumb(Item it, {double size = 58}) {
     child: Container(
       width: size,
       height: size,
-      color: const Color(0xFFEEEEEE),
+      color: P.thumb,
       alignment: Alignment.center,
       child: hasPhoto
           ? Image.file(File(it.photo), width: size, height: size, fit: BoxFit.cover, cacheWidth: 200)
@@ -53,7 +53,7 @@ class ItemTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: Colors.white,
+        color: P.card,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
@@ -76,7 +76,7 @@ class ItemTile extends StatelessWidget {
                   Text(sub,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13, color: Colors.black54)),
+                      style: TextStyle(fontSize: 13, color: P.muted)),
                 ]),
               ),
               const SizedBox(width: 8),

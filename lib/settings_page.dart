@@ -96,13 +96,13 @@ class _SettingsPageState extends State<SettingsPage> {
   }) {
     return Card(
       elevation: 0,
-      color: Colors.white,
+      color: P.card,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
           const SizedBox(height: 6),
-          Text(help, style: const TextStyle(color: Colors.black54, height: 1.4)),
+          Text(help, style: TextStyle(color: P.muted, height: 1.4)),
           const SizedBox(height: 10),
           TextField(
             controller: ctrl,
@@ -165,7 +165,7 @@ class _SettingsPageState extends State<SettingsPage> {
       builder: (context, _) {
         final card = (List<Widget> children) => Card(
               elevation: 0,
-              color: Colors.white,
+              color: P.card,
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
@@ -174,7 +174,7 @@ class _SettingsPageState extends State<SettingsPage> {
         final head = [
           Text('☁️ ${t('acc_title')}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
           const SizedBox(height: 6),
-          Text(t('acc_text'), style: const TextStyle(color: Colors.black54, height: 1.4)),
+          Text(t('acc_text'), style: TextStyle(color: P.muted, height: 1.4)),
           const SizedBox(height: 12),
         ];
         final server = <Widget>[
@@ -256,7 +256,7 @@ class _SettingsPageState extends State<SettingsPage> {
         }
 
         String st;
-        Color col = Colors.black54;
+        Color col = P.muted;
         if (syncer.running) {
           st = '⟳ …';
         } else if (syncer.error != null) {
@@ -277,7 +277,7 @@ class _SettingsPageState extends State<SettingsPage> {
             Expanded(child: Text(auth.email, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
           ]),
           const SizedBox(height: 10),
-          Text(t('acc_other_phones'), style: const TextStyle(color: Colors.black54, fontSize: 13)),
+          Text(t('acc_other_phones'), style: TextStyle(color: P.muted, fontSize: 13)),
           const SizedBox(height: 10),
           Row(children: [
             FilledButton.tonalIcon(
@@ -320,7 +320,7 @@ class _SettingsPageState extends State<SettingsPage> {
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                   '☁️ ${t('cloud_count')}: ${snap.data ?? '…'} · 📱 ${t('phone_count')}: ${store.items.length}',
-                  style: const TextStyle(color: Colors.black54)),
+                  style: TextStyle(color: P.muted)),
             ),
           ),
           if (syncer.photoWarning.isNotEmpty)
@@ -348,7 +348,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final m = notifier.minute.toString().padLeft(2, '0');
     return Card(
       elevation: 0,
-      color: Colors.white,
+      color: P.card,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -379,7 +379,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 6),
             Text(t('notif_days'), style: const TextStyle(fontWeight: FontWeight.w600)),
-            Text(t('notif_days_help'), style: const TextStyle(color: Colors.black54, fontSize: 13)),
+            Text(t('notif_days_help'), style: TextStyle(color: P.muted, fontSize: 13)),
             const SizedBox(height: 6),
             Wrap(spacing: 6, runSpacing: 6, children: [
               for (final d in dayOptions)
@@ -434,6 +434,22 @@ class _SettingsPageState extends State<SettingsPage> {
             },
           ),
           const SizedBox(height: 20),
+          Text(t('theme_title'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          const SizedBox(height: 8),
+          SegmentedButton<String>(
+            segments: [
+              ButtonSegment(value: 'light', label: Text(t('theme_light')), icon: const Icon(Icons.light_mode_outlined)),
+              ButtonSegment(value: 'dark', label: Text(t('theme_dark')), icon: const Icon(Icons.dark_mode_outlined)),
+              ButtonSegment(value: 'system', label: Text(t('theme_system'))),
+            ],
+            selected: {store.settings['theme'] ?? 'light'},
+            onSelectionChanged: (v) async {
+              await store.setSetting('theme', v.first);
+              store.notify();
+              if (mounted) setState(() {});
+            },
+          ),
+          const SizedBox(height: 20),
           Text(t('hand_title'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
           const SizedBox(height: 8),
           SegmentedButton<String>(
@@ -456,7 +472,7 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 24),
           Text(t('db_title'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
           const SizedBox(height: 6),
-          Text(t('db_text'), style: const TextStyle(color: Colors.black54, height: 1.4)),
+          Text(t('db_text'), style: TextStyle(color: P.muted, height: 1.4)),
           const SizedBox(height: 10),
           _keyBlock(
             title: t('mfds_key'),
@@ -513,7 +529,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 20),
           Row(children: [
-            Expanded(child: Text('${t('version')}: $buildName', style: const TextStyle(color: Colors.black54))),
+            Expanded(child: Text('${t('version')}: $buildName', style: TextStyle(color: P.muted))),
             FilledButton.tonalIcon(
               onPressed: () => offerUpdate(context, manual: true),
               icon: const Icon(Icons.system_update),
@@ -521,7 +537,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ]),
           const SizedBox(height: 12),
-          Text(t('about_data'), style: const TextStyle(color: Colors.black45)),
+          Text(t('about_data'), style: TextStyle(color: P.faint)),
         ],
       ),
     );

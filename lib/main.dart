@@ -33,14 +33,29 @@ class SrokomerApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: store,
-      builder: (context, _) => MaterialApp(
+      builder: (context, _) {
+        // Тема: светлая / тёмная (чёрный фон — экономит батарею на AMOLED) / как в телефоне
+        final mode = store.settings['theme'] ?? 'light';
+        final sysDark = WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
+        darkMode = mode == 'dark' || (mode == 'system' && sysDark);
+        return MaterialApp(
         title: 'L할인마트 유통기한',
         debugShowCheckedModeBanner: false,
+        themeMode: darkMode ? ThemeMode.dark : ThemeMode.light,
         theme: ThemeData(
           useMaterial3: true,
           colorSchemeSeed: brand,
           scaffoldBackgroundColor: bg,
           appBarTheme: const AppBarTheme(backgroundColor: bg, surfaceTintColor: Colors.transparent),
+        ),
+        darkTheme: ThemeData(
+          useMaterial3: true,
+          brightness: Brightness.dark,
+          colorScheme: ColorScheme.fromSeed(seedColor: brand, brightness: Brightness.dark)
+              .copyWith(surface: const Color(0xFF0E100E)),
+          scaffoldBackgroundColor: Colors.black,
+          canvasColor: Colors.black,
+          appBarTheme: const AppBarTheme(backgroundColor: Colors.black, surfaceTintColor: Colors.transparent),
         ),
         locale: Locale(lang),
         supportedLocales: const [Locale('ru'), Locale('ko'), Locale('en')],
@@ -50,7 +65,8 @@ class SrokomerApp extends StatelessWidget {
           GlobalCupertinoLocalizations.delegate,
         ],
         home: const HomePage(),
-      ),
+      );
+      },
     );
   }
 }
@@ -93,6 +109,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   void _onStore() {
     if (mounted) setState(() {});
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    store.notify(); // режим «как в телефоне»: перекрасить сразу
   }
 
   @override
@@ -303,7 +324,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Material(
-              color: const Color(0xFFFFF0E0),
+              color: P.warn,
               borderRadius: BorderRadius.circular(14),
               child: InkWell(
                 borderRadius: BorderRadius.circular(14),
@@ -329,7 +350,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         const SizedBox(height: 12),
         // ---- последний отсканированный ----
         if (_lastScanned() != null) ...[
-          Text(t('last_scanned'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black54)),
+          Text(t('last_scanned'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: P.muted)),
           const SizedBox(height: 6),
           ItemTile(_lastScanned()!, key: const ValueKey('last-scanned')),
           const SizedBox(height: 4),
@@ -339,11 +360,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           onTap: () => _open(ListPage(title: t('all_items'), focusSearch: true)),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+            decoration: BoxDecoration(color: P.card, borderRadius: BorderRadius.circular(14)),
             child: Row(children: [
-              const Icon(Icons.search, color: Colors.black54),
+              Icon(Icons.search, color: P.muted),
               const SizedBox(width: 10),
-              Expanded(child: Text(t('search'), style: const TextStyle(color: Colors.black54, fontSize: 15))),
+              Expanded(child: Text(t('search'), style: TextStyle(color: P.muted, fontSize: 15))),
             ]),
           ),
         ),
@@ -365,7 +386,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               onPressed: () => _open(ListPage(urg: Urg.orange, title: t('soon_list'))),
               child: Text('${t('all_items')} (${soon.length}) →'),
             ),
-          Text(t('hold_hint'), textAlign: TextAlign.center, style: const TextStyle(color: Colors.black45, fontSize: 12.5)),
+          Text(t('hold_hint'), textAlign: TextAlign.center, style: TextStyle(color: P.faint, fontSize: 12.5)),
         ],
       ],
     );
@@ -383,7 +404,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Widget _note(String text) => Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+        decoration: BoxDecoration(color: P.card, borderRadius: BorderRadius.circular(14)),
         child: Text(text, style: const TextStyle(fontSize: 15, height: 1.4)),
       );
 
@@ -393,7 +414,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
         child: Material(
-          color: active ? urgSoft(u) : Colors.white,
+          color: active ? urgSoft(u) : P.card,
           borderRadius: BorderRadius.circular(16),
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
@@ -403,8 +424,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('$n',
                     style: TextStyle(
-                        fontSize: 28, fontWeight: FontWeight.w800, color: active ? urgColor(u) : Colors.black26)),
-                Text(label, style: const TextStyle(fontSize: 13, color: Colors.black87)),
+                        fontSize: 28, fontWeight: FontWeight.w800, color: active ? urgColor(u) : P.dim)),
+                Text(label, style: TextStyle(fontSize: 13, color: P.strong)),
               ]),
             ),
           ),
@@ -414,7 +435,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Widget _bigButton(String emoji, String title, String sub, VoidCallback onTap) => Material(
-        color: Colors.white,
+        color: P.card,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
@@ -425,9 +446,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               Text(emoji, style: const TextStyle(fontSize: 28)),
               const SizedBox(width: 14),
               Expanded(child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
-              Text(sub, style: const TextStyle(color: Colors.black54, fontSize: 14)),
+              Text(sub, style: TextStyle(color: P.muted, fontSize: 14)),
               const SizedBox(width: 6),
-              const Icon(Icons.chevron_right, color: Colors.black45),
+              Icon(Icons.chevron_right, color: P.faint),
             ]),
           ),
         ),
@@ -489,7 +510,7 @@ class CategoriesPage extends StatelessWidget {
                     ? t('today')
                     : tf('short_days', {'n': m});
     return Material(
-      color: Colors.white,
+      color: P.card,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -519,7 +540,7 @@ class CategoriesPage extends StatelessWidget {
                   ),
                 ])
               else
-                const Text('0', style: TextStyle(fontSize: 13, color: Colors.black45)),
+                Text('0', style: TextStyle(fontSize: 13, color: P.faint)),
             ]),
           ),
         ),
