@@ -17,6 +17,7 @@ class ItemFormPage extends StatefulWidget {
   final String info;
   final bool focusName;
   final bool autoOcr;
+  final bool autoPhoto; // сразу открыть камеру для главного фото (название возьмётся с него)
   const ItemFormPage({
     super.key,
     required this.item,
@@ -24,6 +25,7 @@ class ItemFormPage extends StatefulWidget {
     this.info = '',
     this.focusName = false,
     this.autoOcr = false,
+    this.autoPhoto = false,
   });
 
   @override
@@ -58,7 +60,9 @@ class _ItemFormPageState extends State<ItemFormPage> {
     catManual = !widget.isNew;
     geminiWarmUp(); // заранее открыть соединение — первое распознавание быстрее
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widget.autoOcr) {
+      if (widget.autoPhoto) {
+        _changePhoto(true);
+      } else if (widget.autoOcr) {
         _ocrName();
       } else if (widget.focusName) {
         nameFocus.requestFocus();

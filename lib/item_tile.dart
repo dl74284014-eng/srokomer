@@ -9,11 +9,12 @@ import 'store.dart';
 import 'widgets.dart';
 
 Future<void> openItemForm(BuildContext context, Item it,
-    {bool isNew = true, String info = '', bool focusName = false, bool autoOcr = false}) {
+    {bool isNew = true, String info = '', bool focusName = false, bool autoOcr = false, bool autoPhoto = false}) {
   return Navigator.push(
     context,
     MaterialPageRoute(
-      builder: (_) => ItemFormPage(item: it, isNew: isNew, info: info, focusName: focusName, autoOcr: autoOcr),
+      builder: (_) => ItemFormPage(
+          item: it, isNew: isNew, info: info, focusName: focusName, autoOcr: autoOcr, autoPhoto: autoPhoto),
     ),
   );
 }

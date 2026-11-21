@@ -165,7 +165,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         confirmed = true;
       }
     }
-    openItemForm(context, 
+    if (!confirmed) {
+      // «Нет, это не тот товар»: найденные название и фото НЕ используем.
+      // Сразу открываем камеру для главного фото — название возьмётся с него.
+      openItemForm(context, Item(id: newId(), barcode: code), info: t('wrong_product'), autoPhoto: true);
+      return;
+    }
+    openItemForm(context,
       Item(
         id: newId(),
         name: name,
@@ -173,8 +179,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         barcode: code,
         photo: found.photo,
       ),
-      focusName: !confirmed,
-      info: confirmed ? '' : t('fix_name'),
     );
   }
 
