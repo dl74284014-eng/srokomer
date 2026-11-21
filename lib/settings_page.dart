@@ -133,6 +133,7 @@ class _SettingsPageState extends State<SettingsPage> {
   final TextEditingController email = TextEditingController();
   final TextEditingController pass = TextEditingController();
   bool authBusy = false;
+  late Future<int?> _cloudCount = syncer.cloudCount();
   String? authMsg;
 
   Future<void> _doAuth(bool register) async {
@@ -279,7 +280,12 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 10),
           Row(children: [
             FilledButton.tonalIcon(
-              onPressed: syncer.running ? null : syncer.syncNow,
+              onPressed: syncer.running
+                  ? null
+                  : () async {
+                      await syncer.syncNow();
+                      if (mounted) setState(() => _cloudCount = syncer.cloudCount());
+                    },
               icon: const Icon(Icons.sync),
               label: Text(t('sync_now')),
             ),
@@ -306,6 +312,20 @@ class _SettingsPageState extends State<SettingsPage> {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(st, style: TextStyle(color: col, fontWeight: FontWeight.w600)),
+            ),
+          FutureBuilder<int?>(
+            future: _cloudCount,
+            builder: (context, snap) => Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                  '☁️ ${t('cloud_count')}: ${snap.data ?? '…'} · 📱 ${t('phone_count')}: ${store.items.length}',
+                  style: const TextStyle(color: Colors.black54)),
+            ),
+          ),
+          if (syncer.photoWarning.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text('⚠️ ${syncer.photoWarning}', style: const TextStyle(color: Color(0xFFE5740B), fontSize: 12.5)),
             ),
           ...server,
         ]);

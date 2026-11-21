@@ -64,7 +64,6 @@ class SyncService extends ChangeNotifier {
       return;
     }
     running = true;
-    final hadError = error != null;
     error = null;
     if (!quiet) notifyListeners();
     try {
@@ -79,7 +78,7 @@ class SyncService extends ChangeNotifier {
       debugPrint('syncer error $e');
     } finally {
       running = false;
-      if (!quiet || hadError || error != null) notifyListeners();
+      notifyListeners();
     }
     if (_again) {
       _again = false;
@@ -98,6 +97,21 @@ class SyncService extends ChangeNotifier {
     if (r.statusCode >= 300) throw 'photo ${r.statusCode}: ${utf8.decode(r.bodyBytes)}';
   }
 
+  /// Ошибка с фото (не мешает сохранять товары). Пусто — всё хорошо.
+  String photoWarning = '';
+  final Set<String> _photoRetry = {};
+
+  Future<bool> _tryUpload(String localPath, String remoteName) async {
+    try {
+      await _uploadPhoto(localPath, remoteName);
+      photoWarning = '';
+      return true;
+    } catch (e) {
+      photoWarning = '$e';
+      return false;
+    }
+  }
+
   String _fileName(String path) => path.split('/').last;
 
   Future<void> _push() async {
@@ -111,8 +125,11 @@ class SyncService extends ChangeNotifier {
         if (it != null) {
           if (it.photo.isNotEmpty && it.photoRemote.isEmpty && File(it.photo).existsSync()) {
             final rn = '$space/${_fileName(it.photo)}';
-            await _uploadPhoto(it.photo, rn);
-            it.photoRemote = rn;
+            if (await _tryUpload(it.photo, rn)) {
+              it.photoRemote = rn;
+            } else {
+              _photoRetry.add(id); // товар сохраняем сейчас, фото дошлём позже
+            }
           }
           final data = it.toJson()..remove('photo');
           rows.add({'owner': space, 'id': id, 'data': data, 'updated_at': it.updatedAt, 'deleted': false});
@@ -127,6 +144,8 @@ class SyncService extends ChangeNotifier {
           .timeout(const Duration(seconds: 30));
       if (r.statusCode >= 300) throw 'items ${r.statusCode}: ${utf8.decode(r.bodyBytes)}';
       store.dirtyItems.removeAll(ids);
+      store.dirtyItems.addAll(_photoRetry); // повторить отправку фото в следующий раз
+      _photoRetry.clear();
       await store.save();
     }
     if (store.dirtyProducts.isNotEmpty) {
@@ -137,8 +156,7 @@ class SyncService extends ChangeNotifier {
         if (p == null) continue;
         if (p.photo.isNotEmpty && p.photoRemote.isEmpty && File(p.photo).existsSync()) {
           final rn = '$space/${_fileName(p.photo)}';
-          await _uploadPhoto(p.photo, rn);
-          p.photoRemote = rn;
+          if (await _tryUpload(p.photo, rn)) p.photoRemote = rn;
         }
         final data = p.toJson()..remove('photo');
         rows.add({'owner': space, 'code': c, 'data': data, 'updated_at': p.updatedAt});
@@ -156,6 +174,67 @@ class SyncService extends ChangeNotifier {
   }
 
   // ---------------- получение ----------------
+  final Set<String> _needPhotos = {};
+  final Set<String> _needProductPhotos = {};
+  bool _downloading = false;
+
+  String _existingLocal(String remote) {
+    if (remote.isEmpty) return '';
+    final path = '${store.photoDir.path}/${_fileName(remote)}';
+    return File(path).existsSync() ? path : '';
+  }
+
+  /// Фото докачиваются в фоне, товары уже видны.
+  Future<void> _downloadPhotos() async {
+    if (_downloading) return;
+    _downloading = true;
+    try {
+      for (final id in _needPhotos.toList()) {
+        final i = store.items.indexWhere((e) => e.id == id);
+        if (i < 0) {
+          _needPhotos.remove(id);
+          continue;
+        }
+        final path = await _localPhotoFor(store.items[i].photoRemote);
+        if (path.isNotEmpty) {
+          final j = store.items.indexWhere((e) => e.id == id);
+          if (j >= 0) store.items[j].photo = path;
+          _needPhotos.remove(id);
+          store.notify();
+        }
+      }
+      for (final code in _needProductPhotos.toList()) {
+        final p = store.products[code];
+        if (p == null) {
+          _needProductPhotos.remove(code);
+          continue;
+        }
+        final path = await _localPhotoFor(p.photoRemote);
+        if (path.isNotEmpty) {
+          p.photo = path;
+          _needProductPhotos.remove(code);
+        }
+      }
+      await store.save();
+    } finally {
+      _downloading = false;
+    }
+  }
+
+  /// Сколько товаров лежит в облаке (для проверки).
+  Future<int?> cloudCount() async {
+    try {
+      final tk = await auth.accessToken();
+      if (tk == null) return null;
+      _token = tk;
+      final r = await http.get(_rest('items', {'select': 'id', 'deleted': 'eq.false', 'limit': '1'}),
+          headers: {..._h, 'Prefer': 'count=exact'}).timeout(const Duration(seconds: 15));
+      final cr = r.headers['content-range'] ?? '';
+      return int.tryParse(cr.split('/').last);
+    } catch (_) {
+      return null;
+    }
+  }
   Future<String> _localPhotoFor(String remote) async {
     if (remote.isEmpty) return '';
     final name = _fileName(remote);
@@ -210,7 +289,8 @@ class SyncService extends ChangeNotifier {
       if (i >= 0 && store.items[i].photoRemote == remote.photoRemote && store.items[i].photo.isNotEmpty) {
         remote.photo = store.items[i].photo;
       } else {
-        remote.photo = await _localPhotoFor(remote.photoRemote);
+        remote.photo = _existingLocal(remote.photoRemote);
+        if (remote.photo.isEmpty && remote.photoRemote.isNotEmpty) _needPhotos.add(id);
       }
       if (i >= 0) {
         store.items[i] = remote;
@@ -237,7 +317,8 @@ class SyncService extends ChangeNotifier {
       if (old != null && old.photoRemote == p.photoRemote && old.photo.isNotEmpty) {
         p.photo = old.photo;
       } else {
-        p.photo = await _localPhotoFor(p.photoRemote);
+        p.photo = _existingLocal(p.photoRemote);
+        if (p.photo.isEmpty && p.photoRemote.isNotEmpty) _needProductPhotos.add(code);
       }
       store.products[code] = p;
       changed = true;
@@ -249,6 +330,7 @@ class SyncService extends ChangeNotifier {
 
     if (changed || sinceChanged) await store.save();
     if (changed) store.notify();
+    unawaited(_downloadPhotos());
   }
 
   /// После входа в аккаунт: всё, что есть на телефоне, объединяется с облаком.
