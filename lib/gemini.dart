@@ -3,10 +3,11 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
-final _client = http.Client(); // одно соединение на всё время — без повторных рукопожатий
 
 import 'models.dart';
 import 'store.dart';
+
+final _client = http.Client(); // одно соединение на всё время — без повторных рукопожатий
 
 /// Распознавание упаковки через Google Gemini (точнее встроенного ML Kit).
 class GeminiResult {
