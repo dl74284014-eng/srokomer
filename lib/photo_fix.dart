@@ -3,7 +3,11 @@ import 'dart:typed_data';
 
 import 'models.dart';
 import 'store.dart';
+import 'lookup.dart';
 import 'sync.dart';
+
+/// Текст с фото (распознавание на телефоне).
+Future<String> readPhotoText(String path) async => (await ocrLines(path)).map((l) => l.text).join(' ');
 
 /// Размер картинки по заголовку файла (JPEG/PNG), без полной загрузки.
 (int, int)? imageSize(File f) {
@@ -203,4 +207,125 @@ Future<(int, int)> fixPhotos({bool removeWeb = false, bool cloud = true}) async 
     store.onLocalChange?.call();
   }
   return (removed, restored);
+}
+
+// ======================================================================
+// Проверка «фото на своём месте»: читаем текст с каждого фото и сравниваем с названиями товаров.
+// ======================================================================
+
+/// Слоги/буквы названия без пробелов, знаков и объёма — для сравнения.
+String _norm(String s) => s
+    .toLowerCase()
+    .replaceAll(RegExp(r'\d+([.,]\d+)?\s*(ml|l|g|kg|개입|개|입|병|매|팩|봉|캔|can|box|ea)'), ' ')
+    .replaceAll(RegExp(r'[^0-9a-z가-힣]'), '');
+
+Set<String> _bigrams(String s) {
+  final out = <String>{};
+  final r = s.runes.toList();
+  for (var i = 0; i + 1 < r.length; i++) {
+    out.add(String.fromCharCodes([r[i], r[i + 1]]));
+  }
+  if (r.length == 1) out.add(s);
+  return out;
+}
+
+/// Насколько текст с фото похож на название товара: 0..1.
+double nameScore(String itemName, String photoText) {
+  final a = _bigrams(_norm(itemName));
+  if (a.isEmpty) return 0;
+  final b = _bigrams(_norm(photoText));
+  return a.where(b.contains).length / a.length;
+}
+
+/// Переставляет фото на свои места. Возвращает (перемещено, проверено).
+Future<(int, int)> rematchPhotos(Future<String> Function(String path) readText,
+    void Function(int done, int total) onProgress) async {
+  final withPhoto = store.items.where((i) => _exists(i.photo)).toList();
+  final texts = <String, String>{}; // путь фото → прочитанный текст
+  for (var k = 0; k < withPhoto.length; k++) {
+    onProgress(k, withPhoto.length);
+    final p = withPhoto[k].photo;
+    if (texts.containsKey(p)) continue;
+    try {
+      texts[p] = await readText(p);
+    } catch (_) {
+      texts[p] = '';
+    }
+  }
+  onProgress(withPhoto.length, withPhoto.length);
+
+  // варианты «фото → товар» с уверенностью
+  final cands = <(String, Item, double)>[];
+  final current = <String, double>{}; // насколько фото подходит своему нынешнему товару
+  for (final it in withPhoto) {
+    final txt = texts[it.photo] ?? '';
+    if (_norm(txt).length < 2) continue; // на фото не нашлось текста — не трогаем
+    current[it.photo] = nameScore(it.name, txt);
+    for (final other in store.items) {
+      final sc = nameScore(other.name, txt);
+      if (sc >= 0.5) cands.add((it.photo, other, sc));
+    }
+  }
+  cands.sort((a, b) => b.$3.compareTo(a.$3));
+
+  final now = DateTime.now().millisecondsSinceEpoch;
+  final takenPhotos = <String>{};
+  final filledItems = <String>{};
+  final newPhoto = <String, String>{}; // id товара → фото
+  for (final (photo, item, sc) in cands) {
+    if (takenPhotos.contains(photo) || filledItems.contains(item.id)) continue;
+    final cur = current[photo] ?? 0;
+    final owner = withPhoto.firstWhere((i) => i.photo == photo);
+    if (owner.id == item.id) {
+      // фото уже у своего товара — закрепляем
+      takenPhotos.add(photo);
+      filledItems.add(item.id);
+      continue;
+    }
+    // переносим только если другой товар подходит заметно лучше
+    if (sc - cur < 0.25) continue;
+    // а у товара-получателя его нынешнее фото подходит хуже
+    if (_exists(item.photo)) {
+      final mine = nameScore(item.name, texts[item.photo] ?? '');
+      if (mine >= sc - 0.1) continue;
+    }
+    takenPhotos.add(photo);
+    filledItems.add(item.id);
+    newPhoto[item.id] = photo;
+  }
+
+  var moved = 0;
+  if (newPhoto.isNotEmpty) {
+    final stillUsed = <String>{};
+    for (final it in store.items) {
+      final np = newPhoto[it.id];
+      if (np != null) stillUsed.add(np);
+    }
+    for (final it in store.items) {
+      final np = newPhoto[it.id];
+      if (np != null) {
+        it.photo = np;
+        it.photoRemote = '';
+        moved++;
+      } else if (stillUsed.contains(it.photo)) {
+        it.photo = ''; // это фото забрал правильный товар
+        it.photoRemote = '';
+      } else {
+        continue;
+      }
+      it.updatedAt = now;
+      store.dirtyItems.add(it.id);
+      if (it.barcode.isNotEmpty && store.products[it.barcode] != null) {
+        final p = store.products[it.barcode]!;
+        p.photo = it.photo;
+        p.photoRemote = '';
+        p.updatedAt = now;
+        store.dirtyProducts.add(it.barcode);
+      }
+    }
+    await store.save();
+    store.notify();
+    store.onLocalChange?.call();
+  }
+  return (moved, withPhoto.length);
 }

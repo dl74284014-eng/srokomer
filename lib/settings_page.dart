@@ -505,6 +505,12 @@ class _SettingsPageState extends State<SettingsPage> {
             icon: const Icon(Icons.restore),
             label: Text(t('photo_restore')),
           ),
+          const SizedBox(height: 8),
+          FilledButton.tonalIcon(
+            onPressed: () => runRematch(context),
+            icon: const Icon(Icons.swap_horiz),
+            label: Text(t('photo_rematch')),
+          ),
           const SizedBox(height: 10),
           _keyBlock(
             title: t('gemini_key'),

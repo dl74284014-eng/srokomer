@@ -96,6 +96,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         await syncer.syncNow();
         final r = await fixPhotos(removeWeb: first);
         if (first) await store.setSetting('photoFix2', '1');
+        if (store.settings['photoRematch1'] != '1' && mounted) {
+          await store.setSetting('photoRematch1', '1');
+          await runRematch(context); // один раз: расставить фото по своим товарам
+        }
         if (mounted && (r.$1 > 0 || r.$2 > 0)) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               duration: const Duration(seconds: 6), content: Text(tf('photo_fix_done', {'r': r.$2, 'w': r.$1}))));

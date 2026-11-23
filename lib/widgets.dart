@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'gemini.dart';
 import 'lookup.dart';
 import 'models.dart';
+import 'photo_fix.dart';
 import 'store.dart';
 import 'l10n.dart';
 
@@ -328,4 +329,29 @@ Future<int> fillMissingPhotos(void Function(int done, int total) onProgress) asy
   }
   onProgress(todo.length, todo.length);
   return found;
+}
+
+
+/// Проверить, что фото на своих местах (с окном прогресса).
+Future<void> runRematch(BuildContext context) async {
+  final prog = ValueNotifier<String>('…');
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => PopScope(
+      canPop: false,
+      child: AlertDialog(
+        content: Row(children: [
+          const SizedBox(width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 3)),
+          const SizedBox(width: 14),
+          Expanded(child: ValueListenableBuilder<String>(valueListenable: prog, builder: (_, v, __) => Text(v))),
+        ]),
+      ),
+    ),
+  );
+  final r = await rematchPhotos(readPhotoText, (d, n) => prog.value = '${t('photo_checking')} $d / $n');
+  if (!context.mounted) return;
+  Navigator.of(context, rootNavigator: true).pop();
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      duration: const Duration(seconds: 6), content: Text(tf('photo_rematch_done', {'m': r.$1, 'n': r.$2}))));
 }
