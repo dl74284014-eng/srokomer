@@ -452,6 +452,12 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 8),
           FilledButton.tonalIcon(
+            onPressed: () => runCategorizeAll(context),
+            icon: const Icon(Icons.category_outlined),
+            label: Text(t('cat_all')),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.tonalIcon(
             onPressed: () => runRematch(context),
             icon: const Icon(Icons.swap_horiz),
             label: Text(t('photo_rematch')),

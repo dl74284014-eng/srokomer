@@ -127,9 +127,11 @@ class _ItemFormPageState extends State<ItemFormPage> {
       finish();
     });
     var gotGemini = false;
+    String gCat = 'other';
     geminiRead(path).then((g) {
       if (g != null && g.names.isNotEmpty) {
         gotGemini = true;
+        gCat = g.category;
         text.value = g.names.first;
         alts = [...g.names, ...alts.where((e) => !g.names.contains(e))];
         gExp = g.expiry;
@@ -141,7 +143,6 @@ class _ItemFormPageState extends State<ItemFormPage> {
       finish();
     });
 
-    String gCat = 'other';
     String? chosen;
     final ans = await askLive(context, title: t('is_name_q'), text: text, refining: refining, imagePath: path);
     if (!mounted) return;
@@ -166,12 +167,19 @@ class _ItemFormPageState extends State<ItemFormPage> {
     final String picked = chosen;
     setState(() {
       name.text = picked;
-      if (!catManual) {
-        final gc = gCat != 'other' ? gCat : guessCategory(picked);
-        if (gc != 'other') category = gc;
-      }
       photo = saved;
     });
+    // Категория: предлагает Gemini (или словарь), и спрашиваем — верно ли
+    if (!catManual && mounted) {
+      final suggest = gCat != 'other' ? gCat : guessCategory(picked);
+      final c = await askCategory(context, suggest);
+      if (c != null && mounted) {
+        setState(() {
+          category = c;
+          catManual = true;
+        });
+      }
+    }
   }
 
   // ---------- считать срок годности ----------
@@ -443,6 +451,29 @@ class _ItemFormPageState extends State<ItemFormPage> {
               child: Text(leftText(dl),
                   style: TextStyle(color: urgColor(urgency(dl)), fontWeight: FontWeight.w700)),
             ),
+          gap,
+          // категория
+          InkWell(
+            borderRadius: BorderRadius.circular(4),
+            onTap: () async {
+              final c = await pickCategory(context, category);
+              if (c != null) {
+                setState(() {
+                  category = c;
+                  catManual = true;
+                });
+              }
+            },
+            child: InputDecorator(
+              decoration: InputDecoration(labelText: t('category'), border: const OutlineInputBorder()),
+              child: Row(children: [
+                Text(catOf(category).e, style: const TextStyle(fontSize: 22)),
+                const SizedBox(width: 10),
+                Expanded(child: Text(catName(catOf(category)), style: const TextStyle(fontSize: 16))),
+                const Icon(Icons.arrow_drop_down),
+              ]),
+            ),
+          ),
           gap,
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Container(

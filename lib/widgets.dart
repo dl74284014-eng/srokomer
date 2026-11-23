@@ -284,3 +284,120 @@ Future<void> runRematch(BuildContext context) async {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => PhotoReviewPage(doubts)));
   }
 }
+
+
+/// Выбор категории (сетка).
+Future<String?> pickCategory(BuildContext context, String current) {
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(t('category'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 10),
+          Flexible(
+            child: GridView.count(
+              shrinkWrap: true,
+              crossAxisCount: 3,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 1.05,
+              children: [
+                for (final c in cats)
+                  Material(
+                    color: c.k == current ? const Color(0xFF16794C).withValues(alpha: 0.18) : P.card,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => Navigator.pop(ctx, c.k),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          Text(c.e, style: const TextStyle(fontSize: 28)),
+                          const SizedBox(height: 4),
+                          Text(catName(c),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                        ]),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ]),
+      ),
+    ),
+  );
+}
+
+/// «Категория: 🧃 Напитки — верно?» Да → эта; «Другая» → выбор из списка. null — закрыли.
+Future<String?> askCategory(BuildContext context, String suggest) async {
+  final c = catOf(suggest);
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(t('cat_q')),
+      content: Row(children: [
+        Text(c.e, style: const TextStyle(fontSize: 34)),
+        const SizedBox(width: 12),
+        Expanded(child: Text(catName(c), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800))),
+      ]),
+      actionsAlignment: dialogAlign,
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('cat_other'))),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('yes'))),
+      ],
+    ),
+  );
+  if (ok == true) return suggest;
+  if (ok == false && context.mounted) return pickCategory(context, suggest);
+  return null;
+}
+
+
+/// Gemini раскладывает все товары по категориям (по названиям, пачками по 40).
+Future<void> runCategorizeAll(BuildContext context) async {
+  final items = [...store.items];
+  if (items.isEmpty) return;
+  final prog = ValueNotifier<String>('…');
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => PopScope(
+      canPop: false,
+      child: AlertDialog(
+        content: Row(children: [
+          const SizedBox(width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 3)),
+          const SizedBox(width: 14),
+          Expanded(child: ValueListenableBuilder<String>(valueListenable: prog, builder: (_, v, __) => Text(v))),
+        ]),
+      ),
+    ),
+  );
+  var changed = 0;
+  var failed = false;
+  for (var k = 0; k < items.length; k += 40) {
+    prog.value = '${t('cat_working')} $k / ${items.length}';
+    final chunk = items.sublist(k, k + 40 < items.length ? k + 40 : items.length);
+    final res = await geminiCategorize(chunk.map((e) => e.name).toList());
+    if (res == null) {
+      failed = true;
+      break;
+    }
+    for (var i = 0; i < chunk.length; i++) {
+      if (chunk[i].category != res[i]) {
+        final n = Item.fromJson(chunk[i].toJson())..category = res[i];
+        await store.upsertItem(n);
+        changed++;
+      }
+    }
+  }
+  if (!context.mounted) return;
+  Navigator.of(context, rootNavigator: true).pop();
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(failed && changed == 0 ? t('cat_fail') : tf('cat_done', {'n': changed}))));
+}

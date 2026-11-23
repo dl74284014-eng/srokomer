@@ -129,6 +129,7 @@ Future<void> showItemActions(BuildContext context, Item it) async {
           const Divider(height: 1),
           tile('edit', Icons.edit_outlined, t('act_edit')),
           tile('date', Icons.event_outlined, t('act_date')),
+          tile('move', Icons.drive_file_move_outline, t('act_move')),
           if (it.photo.isNotEmpty) tile('nophoto', Icons.hide_image_outlined, t('act_nophoto')),
           if (it.qty > 1) tile('minus', Icons.remove_circle_outline, t('act_minus')),
           tile('delete', Icons.delete_outline, t('delete'), color: const Color(0xFFD6363B)),
@@ -159,6 +160,12 @@ Future<void> showItemActions(BuildContext context, Item it) async {
         ..photo = ''
         ..photoRemote = '';
       await store.upsertItem(n);
+    case 'move':
+      final k = await pickCategory(context, it.category);
+      if (k != null) {
+        final n = Item.fromJson(it.toJson())..category = k;
+        await store.upsertItem(n);
+      }
     case 'minus':
       final n = Item.fromJson(it.toJson())..qty = it.qty - 1;
       await store.upsertItem(n);

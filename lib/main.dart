@@ -100,6 +100,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           await store.setSetting('photoRematch2', '1');
           await runRematch(context); // один раз: расставить фото по своим товарам
         }
+        // один раз: Gemini раскладывает уже добавленные товары по категориям
+        if (store.settings['catAll1'] != '1' && store.items.isNotEmpty && store.geminiKey.isNotEmpty && mounted) {
+          await runCategorizeAll(context);
+          await store.setSetting('catAll1', '1');
+        }
         if (mounted && (r.$1 > 0 || r.$2 > 0)) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               duration: const Duration(seconds: 6), content: Text(tf('photo_fix_done', {'r': r.$2, 'w': r.$1}))));
@@ -339,6 +344,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ),
         const SizedBox(height: 18),
         // ---- плашки: категории и все товары ----
+        _bigButton('📂', t('categories'),
+            '${cats.where((c) => items.any((i) => catOf(i.category).k == c.k)).length} / ${cats.length}',
+            () => _open(const CategoriesPage())),
+        const SizedBox(height: 8),
         _bigButton('📋', t('all_items'), '${items.length} ${t('pcs')}', () => _open(ListPage(title: t('all_items')))),
         const SizedBox(height: 20),
         // ---- скоро заканчивается ----

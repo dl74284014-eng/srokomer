@@ -33,17 +33,36 @@ const _variants = <(String, Map<String, Object>?)>[
 /// Сколько длился последний ответ Gemini (мс) — показывается в окне распознавания.
 int lastGeminiMs = 0;
 
+const _catGuide = '''Categories (key: what belongs there):
+milk: dairy — 우유, 가공유, 요거트/요구르트, 치즈, 버터, 생크림, 두유 (soy milk)
+meat: 육류 — pork, beef, chicken, 햄, 소시지, 베이컨, 스팸
+fish: 수산 — fish, seafood, 어묵, 맛살, 젓갈, frozen shrimp
+veg: fresh fruits and vegetables, 버섯, 샐러드
+kimchi: 김치, 반찬, 단무지, 장아찌, 나물
+tofu: 두부, 계란/달걀, 메추리알
+noodle: 라면, 컵라면, 국수, 우동, 냉면, 파스타
+ready: 도시락, 김밥, 삼각김밥, 즉석식품/HMR, 샌드위치, 밀키트, 죽, 국/찌개 팩
+frozen: 냉동식품, 아이스크림, 만두, 냉동피자
+bread: 빵, 케이크, 베이커리, 떡
+snack: 과자, 초콜릿, 사탕, 젤리, 견과, 쿠키
+drink: 음료 — 탄산음료, 주스, 커피, 차, 생수, 이온/에너지 음료, 홍삼·건강 음료, 술
+sauce: 소스, 장류(고추장/된장/간장), 양념, 조미료, 케첩, 마요네즈, 드레싱
+grocery: 쌀, 즉석밥, 밀가루, 설탕, 소금, 식용유, 통조림, 김(조미김), 시리얼, 잼, 꿀
+other: anything else (non-food, household, gift sets of mixed goods)''';
+
 String _prompt() {
   final now = DateTime.now();
   final today =
       '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   return '''
 Korean supermarket product photo. Return ONLY JSON:
-{"names":["full name","shorter variant"],"expiry":"YYYY-MM-DD or empty","expiry_raw":"date as printed"}
+{"names":["full name","shorter variant"],"category":"one key","expiry":"YYYY-MM-DD or empty","expiry_raw":"date as printed"}
 "names"[0] = everything that would be on a price tag, copied EXACTLY as printed (original language, no translation, keep special characters ®·%-+/&()): brand + product name + flavor/variant + size and count, e.g. "농심 신라면 120g×5", "서울우유 1급A 우유 1000ml", "CJ 비비고 왕교자 1.05kg".
 Size/weight/volume/count (ml, L, g, kg, 개, 개입, 입, 매, ×N) MUST be included if visible anywhere on the package.
 "names"[1] = short name without size. No slogans, ingredients, nutrition, addresses. Invent nothing.
 "expiry": 소비기한/유통기한/까지/EXP date, NOT 제조일/MFG. Dates look like YYYY.MM.DD or YY.MM.DD. Today $today.
+"category": choose the single best key for what the product IS (look at the photo and the name).
+$_catGuide
 ''';
 }
 
@@ -96,7 +115,7 @@ Future<GeminiResult?> geminiRead(String imagePath) async {
       ],
       'generationConfig': {
         'temperature': 0,
-        'maxOutputTokens': 160,
+        'maxOutputTokens': 180,
         'responseMimeType': 'application/json',
         if (thinking != null) 'thinkingConfig': thinking,
       },
@@ -129,7 +148,8 @@ Future<GeminiResult?> geminiRead(String imagePath) async {
       var exp = (o['expiry'] ?? '').toString().trim();
       if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(exp) || parseIso(exp) == null) exp = '';
       lastGeminiMs = sw.elapsedMilliseconds;
-      return GeminiResult(names, 'other', exp, (o['expiry_raw'] ?? '').toString());
+      final cat = (o['category'] ?? '').toString().trim();
+      return GeminiResult(names, catMap.containsKey(cat) ? cat : 'other', exp, (o['expiry_raw'] ?? '').toString());
     } catch (_) {
       return null;
     }
@@ -219,6 +239,54 @@ Future<List<String>?> geminiReadNames(List<String> paths) async {
       if (mm == null) return null;
       final names = ((jsonDecode(mm.group(0)!) as Map)['names'] as List?) ?? [];
       return List.generate(paths.length, (i) => i < names.length ? names[i].toString().trim() : '');
+    } catch (_) {
+      await Future.delayed(const Duration(seconds: 3));
+    }
+  }
+  return null;
+}
+
+
+/// Категории для списка названий (без фото, один запрос на 40 товаров). null — Gemini недоступен.
+Future<List<String>?> geminiCategorize(List<String> names) async {
+  final key = store.geminiKey;
+  if (key.isEmpty || key == _rejectedKey) return null;
+  final list = [for (var i = 0; i < names.length; i++) '$i. ${names[i]}'].join('\n');
+  final body = jsonEncode({
+    'contents': [
+      {
+        'parts': [
+          {
+            'text': 'Korean supermarket products. For each product choose the single best category key.\n'
+                '$_catGuide\n\nProducts:\n$list\n\n'
+                'Return ONLY JSON: {"cats": ["key", ...]} with exactly ${names.length} keys in the same order.'
+          }
+        ]
+      }
+    ],
+    'generationConfig': {'temperature': 0, 'maxOutputTokens': 20 * names.length + 50, 'responseMimeType': 'application/json'},
+  });
+  final start = int.tryParse(store.settings['gemVariant'] ?? '') ?? 0;
+  for (var attempt = 0; attempt < 4; attempt++) {
+    final (model, _) = _variants[start % _variants.length];
+    try {
+      final r = await _post(model, key, body);
+      if (r.statusCode == 429 || r.statusCode >= 500) {
+        await Future.delayed(Duration(seconds: 10 + attempt * 10));
+        continue;
+      }
+      if (r.statusCode != 200) return null;
+      final j = jsonDecode(utf8.decode(r.bodyBytes));
+      final ps = j['candidates']?[0]?['content']?['parts'];
+      if (ps is! List) return null;
+      final text = ps.map((p) => (p is Map && p['thought'] != true ? (p['text'] ?? '') : '').toString()).join();
+      final mm = RegExp(r'\{[\s\S]*\}').firstMatch(text);
+      if (mm == null) return null;
+      final out = ((jsonDecode(mm.group(0)!) as Map)['cats'] as List?) ?? [];
+      return List.generate(names.length, (i) {
+        final k = i < out.length ? out[i].toString().trim() : '';
+        return catMap.containsKey(k) ? k : 'other';
+      });
     } catch (_) {
       await Future.delayed(const Duration(seconds: 3));
     }
