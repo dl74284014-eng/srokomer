@@ -116,29 +116,42 @@ Future<GeminiResult?> geminiRead(String imagePath) async {
   return null;
 }
 
-/// Проверка ключа: null — работает.
+/// Проверка ключа настоящим (маленьким) запросом распознавания — так же, как работает приложение.
+/// null — работает.
 Future<String?> testGeminiKey(String key) async {
-  try {
-    final r = await http
-        .get(Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1'),
-            headers: {'x-goog-api-key': key})
-        .timeout(const Duration(seconds: 15));
-    if (r.statusCode == 200) return null;
-    final b = utf8.decode(r.bodyBytes);
-    return 'HTTP ${r.statusCode} ${b.length > 200 ? b.substring(0, 200) : b}';
-  } catch (e) {
-    return '$e';
+  String? last;
+  for (final (model, thinking) in _variants) {
+    try {
+      final r = await _client
+          .post(
+            Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent'),
+            headers: {'x-goog-api-key': key, 'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'contents': [
+                {
+                  'parts': [
+                    {'text': 'Reply with: ok'}
+                  ]
+                }
+              ],
+              'generationConfig': {'maxOutputTokens': 5, if (thinking != null) 'thinkingConfig': thinking},
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+      if (r.statusCode == 200) return null;
+      final b = utf8.decode(r.bodyBytes);
+      last = 'HTTP ${r.statusCode} ${b.length > 160 ? b.substring(0, 160) : b}';
+      if (r.statusCode == 401 || r.statusCode == 403) return last; // ключ отклонён — дальше пробовать нет смысла
+    } catch (e) {
+      last = '$e';
+    }
   }
+  return last;
 }
 
-/// Заранее открыть соединение с Google, чтобы первое распознавание было быстрее.
+/// Заранее открыть соединение с Google (без запроса к списку моделей — новые ключи AQ. его не принимают).
 Future<void> geminiWarmUp() async {
-  final key = store.geminiKey;
-  if (key.isEmpty) return;
   try {
-    await _client
-        .get(Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1'),
-            headers: {'x-goog-api-key': key})
-        .timeout(const Duration(seconds: 8));
+    await _client.head(Uri.parse('https://generativelanguage.googleapis.com/')).timeout(const Duration(seconds: 8));
   } catch (_) {}
 }
