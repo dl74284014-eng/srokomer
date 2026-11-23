@@ -215,3 +215,23 @@ class Store extends ChangeNotifier {
 }
 
 final store = Store();
+
+
+/// Тот же товар: одинаковый штрих-код, а без штрих-кода — одинаковое название.
+bool sameProduct(Item o, String barcode, String name) {
+  final c = barcode.replaceAll(' ', '');
+  if (c.isNotEmpty) return o.barcode == c;
+  final n = name.trim().toLowerCase();
+  return n.isNotEmpty && o.barcode.isEmpty && o.name.trim().toLowerCase() == n;
+}
+
+/// Все партии (разные сроки) этого товара, по возрастанию срока.
+List<Item> batchesOf(String barcode, String name) {
+  final l = store.items.where((o) => sameProduct(o, barcode, name)).toList();
+  l.sort((a, b) {
+    if (a.expiry.isEmpty) return 1;
+    if (b.expiry.isEmpty) return -1;
+    return a.expiry.compareTo(b.expiry);
+  });
+  return l;
+}

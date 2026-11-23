@@ -161,9 +161,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return;
     }
     // Товар уже в списке — открываем его, а не создаём дубликат
-    final existing = store.items.where((i) => i.barcode == code).toList();
+    final existing = batchesOf(code, '');
     if (existing.isNotEmpty) {
-      openItemForm(context, Item.fromJson(existing.first.toJson()), isNew: false, info: t('already_in_list'));
+      openBatches(context, existing);
       return;
     }
     final known = store.products[code];

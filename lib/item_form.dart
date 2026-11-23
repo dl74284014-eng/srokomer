@@ -6,6 +6,7 @@ import 'l10n.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'gemini.dart';
+import 'item_tile.dart';
 import 'lookup.dart';
 import 'models.dart';
 import 'store.dart';
@@ -18,6 +19,7 @@ class ItemFormPage extends StatefulWidget {
   final bool focusName;
   final bool autoOcr;
   final bool autoPhoto; // сразу открыть камеру для главного фото (название возьмётся с него)
+  final bool autoDate; // сразу открыть выбор срока (новая партия)
   const ItemFormPage({
     super.key,
     required this.item,
@@ -26,6 +28,7 @@ class ItemFormPage extends StatefulWidget {
     this.focusName = false,
     this.autoOcr = false,
     this.autoPhoto = false,
+    this.autoDate = false,
   });
 
   @override
@@ -62,6 +65,8 @@ class _ItemFormPageState extends State<ItemFormPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.autoPhoto) {
         _changePhoto(true);
+      } else if (widget.autoDate) {
+        _pickDate();
       } else if (widget.autoOcr) {
         _ocrName();
       } else if (widget.focusName) {
@@ -251,27 +256,25 @@ class _ItemFormPageState extends State<ItemFormPage> {
         return;
       }
     }
-    // Без дубликатов: если такой товар уже есть (тот же штрих-код или то же название) — обновляем его
+    // Партии: тот же товар с ТЕМ ЖЕ сроком — одна партия (количество складываем),
+    // с другим сроком — отдельная партия.
     var id = widget.item.id;
     var createdAt = widget.item.createdAt;
     final code0 = code.text.replaceAll(' ', '');
-    final name0 = name.text.trim().toLowerCase();
-    for (final o in store.items) {
-      if (o.id == id) continue;
-      final same = (code0.isNotEmpty && o.barcode == code0) || (code0.isEmpty && o.barcode.isEmpty && o.name.trim().toLowerCase() == name0);
-      if (same) {
-        if (!widget.isNew) {
-          // редактирование: убираем второй экземпляр
-          await store.deleteItem(o.id);
-        } else {
-          id = o.id;
-          createdAt = o.createdAt;
-          if (photo.isEmpty) photo = o.photo;
-          if (notes.text.trim().isEmpty && o.notes.isNotEmpty) notes.text = o.notes;
-          _snack(t('updated_existing'));
-        }
-        break;
+    final others = batchesOf(code0, name.text).where((o) => o.id != id).toList();
+    final twin = others.where((o) => o.expiry == expiry).firstOrNull;
+    if (twin != null) {
+      qty += twin.qty;
+      if (photo.isEmpty) photo = twin.photo;
+      if (notes.text.trim().isEmpty && twin.notes.isNotEmpty) notes.text = twin.notes;
+      if (widget.isNew) {
+        id = twin.id;
+        createdAt = twin.createdAt;
+      } else {
+        await store.deleteItem(twin.id);
       }
+      others.remove(twin);
+      _snack(t('batch_merged'));
     }
     setState(() => saving = true);
     final it = Item(
@@ -288,6 +291,22 @@ class _ItemFormPageState extends State<ItemFormPage> {
       createdAt: createdAt,
     );
     await store.upsertItem(it);
+    // Название, категория и фото — общие для всех партий товара
+    for (final o in others) {
+      final noPhoto = o.photo.isEmpty || !File(o.photo).existsSync();
+      if (o.name == it.name && o.nameRu == it.nameRu && o.category == it.category && !(noPhoto && it.photo.isNotEmpty)) {
+        continue;
+      }
+      final n = Item.fromJson(o.toJson())
+        ..name = it.name
+        ..nameRu = it.nameRu
+        ..category = it.category;
+      if (noPhoto && it.photo.isNotEmpty) {
+        n.photo = it.photo;
+        n.photoRemote = '';
+      }
+      await store.upsertItem(n);
+    }
     if (remember && it.barcode.isNotEmpty) {
       await store.putProduct(it.barcode,
           Product(name: it.name, nameRu: it.nameRu, category: it.category, photo: it.photo));
@@ -317,12 +336,48 @@ class _ItemFormPageState extends State<ItemFormPage> {
     }
   }
 
+  Widget _batchesBox(List<Item> same) {
+    Widget row(String date, int q, int? dl, {VoidCallback? onTap, bool current = false}) => InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
+            child: Row(children: [
+              Icon(current ? Icons.radio_button_checked : Icons.inventory_2_outlined, size: 20, color: P.muted),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('${t('until')} ${fmtDate(date)}${q > 1 ? '  ×$q' : ''}${current ? '  (${t('this_batch')})' : ''}',
+                    style: TextStyle(fontSize: 15, fontWeight: current ? FontWeight.w700 : FontWeight.w500)),
+              ),
+              Text(leftText(dl), style: TextStyle(fontSize: 13, color: urgColor(urgency(dl)), fontWeight: FontWeight.w600)),
+              if (onTap != null) Icon(Icons.chevron_right, color: P.muted),
+            ]),
+          ),
+        );
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+      decoration: BoxDecoration(border: Border.all(color: P.dim), borderRadius: BorderRadius.circular(8)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(t('batches_title'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+        if (!widget.isNew) row(expiry, qty, daysLeft(expiry), current: true),
+        for (final o in same)
+          row(o.expiry, o.qty, daysLeft(o.expiry),
+              onTap: () => openItemForm(context, Item.fromJson(o.toJson()), isNew: false)
+                  .then((_) => mounted ? setState(() {}) : null)),
+        if (!widget.isNew)
+          TextButton.icon(
+            onPressed: () => newBatch(context, widget.item).then((_) => mounted ? setState(() {}) : null),
+            icon: const Icon(Icons.add),
+            label: Text(t('batch_add')),
+          ),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final dl = daysLeft(expiry);
-    final same = code.text.isEmpty
-        ? <Item>[]
-        : store.items.where((i) => i.barcode == code.text && i.id != widget.item.id).toList();
+    final same = batchesOf(code.text, name.text).where((i) => i.id != widget.item.id).toList();
     const gap = SizedBox(height: 14);
 
     return Scaffold(
@@ -499,9 +554,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
               ),
             ),
           ]),
-          if (same.isNotEmpty)
-            InfoNote(t('same_code') +
-                same.map((o) => '${t('until')} ${fmtDate(o.expiry)}${o.qty > 1 ? ' ×${o.qty}' : ''}').join(', ')),
+          if (same.isNotEmpty || !widget.isNew) _batchesBox(same),
           gap,
           TextField(
             controller: notes,

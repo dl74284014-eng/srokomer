@@ -9,14 +9,80 @@ import 'store.dart';
 import 'widgets.dart';
 
 Future<void> openItemForm(BuildContext context, Item it,
-    {bool isNew = true, String info = '', bool focusName = false, bool autoOcr = false, bool autoPhoto = false}) {
+    {bool isNew = true, String info = '', bool focusName = false, bool autoOcr = false, bool autoPhoto = false, bool autoDate = false}) {
   return Navigator.push(
     context,
     MaterialPageRoute(
       builder: (_) => ItemFormPage(
-          item: it, isNew: isNew, info: info, focusName: focusName, autoOcr: autoOcr, autoPhoto: autoPhoto),
+          item: it, isNew: isNew, info: info, focusName: focusName, autoOcr: autoOcr, autoPhoto: autoPhoto, autoDate: autoDate),
     ),
   );
+}
+
+/// Новая партия того же товара: название, фото, категория — те же; срок и количество — новые.
+Future<void> newBatch(BuildContext context, Item base) {
+  return openItemForm(
+    context,
+    Item(
+      id: newId(),
+      name: base.name,
+      nameRu: base.nameRu,
+      category: base.category,
+      barcode: base.barcode,
+      photo: base.photo,
+      mute: base.mute,
+    ),
+    info: t('batch_new_info'),
+    autoDate: true,
+  );
+}
+
+/// Список партий товара (после сканирования уже известного штрих-кода).
+Future<void> openBatches(BuildContext context, List<Item> batches) async {
+  final pick = await showModalBottomSheet<Object>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8),
+        child: ListView(shrinkWrap: true, children: [
+          ListTile(
+            leading: itemThumb(batches.first, size: 48),
+            title: Text(batches.first.name.isEmpty ? t('no_name') : batches.first.name,
+                maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text(t('scan_batches')),
+          ),
+          const Divider(height: 1),
+          for (final b in batches)
+            ListTile(
+              leading: const Icon(Icons.inventory_2_outlined),
+              title: Text('${t('until')} ${fmtDate(b.expiry)}${b.qty > 1 ? '  ×${b.qty}' : ''}',
+                  style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w600)),
+              subtitle: Text(leftText(daysLeft(b.expiry)),
+                  style: TextStyle(color: urgColor(urgency(daysLeft(b.expiry))), fontWeight: FontWeight.w600)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.pop(ctx, b),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              onPressed: () => Navigator.pop(ctx, 'new'),
+              icon: const Icon(Icons.add),
+              label: Text(t('batch_add'), style: const TextStyle(fontSize: 16)),
+            ),
+          ),
+        ]),
+      ),
+    ),
+  );
+  if (pick == null || !context.mounted) return;
+  if (pick is Item) {
+    await openItemForm(context, Item.fromJson(pick.toJson()), isNew: false);
+  } else {
+    await newBatch(context, batches.first);
+  }
 }
 
 Widget itemThumb(Item it, {double size = 58}) {
@@ -44,8 +110,10 @@ class ItemTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final dl = daysLeft(it.expiry);
     final u = urgency(dl);
+    final nb = batchesOf(it.barcode, it.name).length;
     final sub = [
       '${t('until')} ${fmtDate(it.expiry)}',
+      if (nb > 1) tf('batches_n', {'n': nb}),
       if (it.qty > 1) '${it.qty} ${t('pcs')}',
       if (it.notes.isNotEmpty) '📝 ${it.notes}',
     ].join(' · ');
@@ -129,6 +197,7 @@ Future<void> showItemActions(BuildContext context, Item it) async {
           const Divider(height: 1),
           tile('edit', Icons.edit_outlined, t('act_edit')),
           tile('date', Icons.event_outlined, t('act_date')),
+          tile('batch', Icons.add_box_outlined, t('act_batch')),
           tile('move', Icons.drive_file_move_outline, t('act_move')),
           if (it.photo.isNotEmpty) tile('nophoto', Icons.hide_image_outlined, t('act_nophoto')),
           if (it.qty > 1) tile('minus', Icons.remove_circle_outline, t('act_minus')),
@@ -155,6 +224,8 @@ Future<void> showItemActions(BuildContext context, Item it) async {
         final n = Item.fromJson(it.toJson())..expiry = isoOf(d);
         await store.upsertItem(n);
       }
+    case 'batch':
+      await newBatch(context, it);
     case 'nophoto':
       final n = Item.fromJson(it.toJson())
         ..photo = ''
