@@ -175,9 +175,10 @@ class Store extends ChangeNotifier {
     return k.isNotEmpty ? k : _defaultKakaoKey;
   }
 
-  static const _defaultGeminiKey = 'AQ.Ab8RN6JO9RVactXmOcY1qS2Zjfoj8FquD6lcrioYnwYyb489zw';
+  static const _defaultGeminiKey = ''; // ключ Gemini не хранится в коде — вводится в Настройках на телефоне
   String get geminiKey {
-    final k = settings['geminiKey'] ?? '';
+    var k = settings['geminiKey'] ?? '';
+    if (k.startsWith('AQ.Ab8RN6JO9RVact')) k = ''; // старый отклонённый ключ — заменён новым
     return (k.isNotEmpty ? k : _defaultGeminiKey).trim();
   }
 
