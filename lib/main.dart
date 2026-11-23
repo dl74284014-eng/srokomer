@@ -65,6 +65,7 @@ class SrokomerApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
+        builder: (context, child) => KeyboardInsetFix(child: child!),
         home: const HomePage(),
       );
       },
@@ -524,5 +525,48 @@ class CategoriesPage extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+
+/// Иногда после камеры Android «забывает» сообщить, что клавиатура закрылась, и приложение
+/// оставляет внизу пустое место под несуществующую клавиатуру (списки обрезаются).
+/// Место под клавиатуру оставляем только когда реально вводится текст в поле.
+class KeyboardInsetFix extends StatefulWidget {
+  final Widget child;
+  const KeyboardInsetFix({super.key, required this.child});
+  @override
+  State<KeyboardInsetFix> createState() => _KeyboardInsetFixState();
+}
+
+class _KeyboardInsetFixState extends State<KeyboardInsetFix> {
+  @override
+  void initState() {
+    super.initState();
+    FocusManager.instance.addListener(_onFocus);
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeListener(_onFocus);
+    super.dispose();
+  }
+
+  void _onFocus() {
+    if (mounted) setState(() {});
+  }
+
+  bool get _typing {
+    final ctx = FocusManager.instance.primaryFocus?.context;
+    if (ctx == null) return false;
+    if (ctx.widget is EditableText) return true;
+    return ctx.findAncestorWidgetOfExactType<EditableText>() != null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    if (mq.viewInsets.bottom == 0 || _typing) return widget.child;
+    return MediaQuery(data: mq.copyWith(viewInsets: EdgeInsets.zero), child: widget.child);
   }
 }
