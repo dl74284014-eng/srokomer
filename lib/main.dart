@@ -151,7 +151,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         context, MaterialPageRoute(builder: (_) => const ScannerPage()));
     if (code == null || !mounted) return;
     if (code == ScannerPage.manual) {
-      openItemForm(context, Item(id: newId()), info: t('no_barcode_info'), autoOcr: true);
+      openItemForm(context, Item(id: newId()), info: t('new_scan_photo'), autoPhoto: true);
       return;
     }
     // Товар уже в списке — открываем его, а не создаём дубликат
@@ -168,58 +168,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       );
       return;
     }
-    final mfdsKey = store.mfdsKey;
-    final kakaoKey = store.kakaoKey;
-    final found = await withLoading(context, tf('searching', {'code': code}), () async {
-      final r = await lookupBarcode(code, mfdsKey: mfdsKey, kakaoKey: kakaoKey);
-      var photo = '';
-      if (r != null && r.imageUrl.isNotEmpty) {
-        final bytes = await download(r.imageUrl);
-        if (bytes != null) photo = await store.savePhotoBytes(bytes);
-      }
-      return (r: r, photo: photo);
-    });
-    if (!mounted) return;
-    final r = found.r;
-    final noKeysHint = (mfdsKey.isEmpty || kakaoKey.isEmpty) ? '\n\n${t('keys_hint')}' : '';
-    if (r == null) {
-      openItemForm(context, Item(id: newId(), barcode: code),
-          info: tf('not_found', {'code': code}) + noKeysHint, autoOcr: true);
-      return;
-    }
-    final sub = [
-      if (r.maker.isNotEmpty) r.maker,
-      if (r.type.isNotEmpty && !r.type.contains(':')) r.type,
-      '${t('source')}: ${r.source}',
-    ].join(' · ');
-    final ok = await askThisOne(context,
-        title: r.guess ? t('guess_q') : t('found_q'), text: r.name, sub: sub, imagePath: found.photo);
-    if (ok == null || !mounted) return;
-    var name = r.name;
-    var confirmed = ok;
-    if (!ok && r.alternatives.length > 1) {
-      final pick = await pickOne(context, t('pick_variant'), r.alternatives.skip(1).toList());
-      if (!mounted) return;
-      if (pick != null) {
-        name = pick;
-        confirmed = true;
-      }
-    }
-    if (!confirmed) {
-      // «Нет, это не тот товар»: найденные название и фото НЕ используем.
-      // Сразу открываем камеру для главного фото — название возьмётся с него.
-      openItemForm(context, Item(id: newId(), barcode: code), info: t('wrong_product'), autoPhoto: true);
-      return;
-    }
-    openItemForm(context,
-      Item(
-        id: newId(),
-        name: name,
-        category: guessCategory('$name ${r.type}'),
-        barcode: code,
-        photo: found.photo,
-      ),
-    );
+    // Новый товар: сразу камера — фотографируете товар, Gemini предлагает название с этого фото
+    openItemForm(context, Item(id: newId(), barcode: code), info: t('new_scan_photo'), autoPhoto: true);
   }
 
   void _open(Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));

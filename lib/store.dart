@@ -163,17 +163,7 @@ class Store extends ChangeNotifier {
   /// Данные пришли из облака — только перерисовать экран.
   void notify() => notifyListeners();
 
-  static const _defaultMfdsKey = '30bc43ac294d4eabbc4f';
-  String get mfdsKey {
-    final k = settings['mfdsKey'] ?? '';
-    return k.isNotEmpty ? k : _defaultMfdsKey;
-  }
 
-  static const _defaultKakaoKey = '17761fbbe8398b95622e6de5869c03ed';
-  String get kakaoKey {
-    final k = settings['kakaoKey'] ?? '';
-    return k.isNotEmpty ? k : _defaultKakaoKey;
-  }
 
   static const _defaultGeminiKey = ''; // ключ Gemini не хранится в коде — вводится в Настройках на телефоне
   String get geminiKey {

@@ -20,24 +20,17 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  late final TextEditingController mfds =
-      TextEditingController(text: store.mfdsKey);
-  late final TextEditingController kakao =
-      TextEditingController(text: store.kakaoKey);
   late final TextEditingController gem = TextEditingController(text: store.geminiKey);
   String? gemStatus;
   bool busyG = false;
   late final TextEditingController supaUrl = TextEditingController(text: store.supaUrl);
   late final TextEditingController supaKey = TextEditingController(text: store.supaKey);
   final TextEditingController joinCode = TextEditingController();
-  String? mfdsStatus, kakaoStatus, syncTest;
+  String? syncTest;
   bool showServer = false;
-  bool busyM = false, busyK = false;
 
   @override
   void dispose() {
-    mfds.dispose();
-    kakao.dispose();
     supaUrl.dispose();
     gem.dispose();
     supaKey.dispose();
@@ -47,18 +40,6 @@ class _SettingsPageState extends State<SettingsPage> {
     super.dispose();
   }
 
-  Future<void> _checkMfds() async {
-    final k = mfds.text.trim();
-    await store.setSetting('mfdsKey', k);
-    if (k.isEmpty) return;
-    setState(() => busyM = true);
-    final err = await testMfdsKey(k);
-    if (!mounted) return;
-    setState(() {
-      busyM = false;
-      mfdsStatus = err == null ? t('key_ok') : '❌ $err';
-    });
-  }
 
   Future<void> _checkGemini() async {
     final k = gem.text.trim();
@@ -73,18 +54,6 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
-  Future<void> _checkKakao() async {
-    final k = kakao.text.trim();
-    await store.setSetting('kakaoKey', k);
-    if (k.isEmpty) return;
-    setState(() => busyK = true);
-    final err = await testKakaoKey(k);
-    if (!mounted) return;
-    setState(() {
-      busyK = false;
-      kakaoStatus = err == null ? t('key_ok') : '❌ $err';
-    });
-  }
 
   Widget _keyBlock({
     required String title,
@@ -471,30 +440,6 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 12),
           _notifBlock(),
           const SizedBox(height: 24),
-          Text(t('db_title'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-          const SizedBox(height: 6),
-          Text(t('db_text'), style: TextStyle(color: P.muted, height: 1.4)),
-          const SizedBox(height: 10),
-          _keyBlock(
-            title: t('mfds_key'),
-            help: t('mfds_help'),
-            ctrl: mfds,
-            busy: busyM,
-            status: mfdsStatus,
-            onCheck: _checkMfds,
-            settingKey: 'mfdsKey',
-          ),
-          const SizedBox(height: 10),
-          _keyBlock(
-            title: t('kakao_key'),
-            help: t('kakao_help'),
-            ctrl: kakao,
-            busy: busyK,
-            status: kakaoStatus,
-            onCheck: _checkKakao,
-            settingKey: 'kakaoKey',
-          ),
-          const SizedBox(height: 10),
           FilledButton.tonalIcon(
             onPressed: () async {
               final r = await withLoading(context, t('photo_fixing'), () => fixPhotos(removeWeb: true));
