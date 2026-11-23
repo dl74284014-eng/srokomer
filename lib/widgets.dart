@@ -6,6 +6,7 @@ import 'gemini.dart';
 import 'lookup.dart';
 import 'models.dart';
 import 'photo_fix.dart';
+import 'photo_review_page.dart';
 import 'store.dart';
 import 'l10n.dart';
 
@@ -333,6 +334,7 @@ Future<int> fillMissingPhotos(void Function(int done, int total) onProgress) asy
 
 
 /// Проверить, что фото на своих местах (с окном прогресса).
+/// Сначала через Gemini (точно, с учётом объёма); без Gemini — встроенным распознаванием.
 Future<void> runRematch(BuildContext context) async {
   final prog = ValueNotifier<String>('…');
   showDialog<void>(
@@ -349,9 +351,20 @@ Future<void> runRematch(BuildContext context) async {
       ),
     ),
   );
-  final r = await rematchPhotos(readPhotoText, (d, n) => prog.value = '${t('photo_checking')} $d / $n');
+  final g = await verifyPhotosGemini((d, n) => prog.value = '${t('photo_checking')} $d / $n');
+  (int, int) r;
+  var doubts = <Doubt>[];
+  if (g != null) {
+    r = (g.$1, g.$2);
+    doubts = g.$3;
+  } else {
+    r = await rematchPhotos(readPhotoText, (d, n) => prog.value = '${t('photo_checking')} $d / $n');
+  }
   if (!context.mounted) return;
   Navigator.of(context, rootNavigator: true).pop();
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       duration: const Duration(seconds: 6), content: Text(tf('photo_rematch_done', {'m': r.$1, 'n': r.$2}))));
+  if (doubts.isNotEmpty) {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => PhotoReviewPage(doubts)));
+  }
 }

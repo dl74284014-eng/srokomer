@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'models.dart';
 import 'store.dart';
+import 'gemini.dart';
 import 'lookup.dart';
 import 'sync.dart';
 
@@ -328,4 +329,131 @@ Future<(int, int)> rematchPhotos(Future<String> Function(String path) readText,
     store.onLocalChange?.call();
   }
   return (moved, withPhoto.length);
+}
+
+
+// ======================================================================
+// Финальная проверка фото через Gemini: полное название с фото (с объёмом и вариантом)
+// сравнивается с названиями товаров.
+// ======================================================================
+
+String _normFull(String s) => s
+    .toLowerCase()
+    .replaceAll(RegExp(r'[×*Ｘ]'), 'x')
+    .replaceAll('ℓ', 'l')
+    .replaceAll(RegExp(r'[^0-9a-z가-힣.x]'), '');
+
+/// Похожесть двух названий 0..1 (коэффициент Дайса по парам символов, с учётом объёма).
+double dice(String a, String b) {
+  final x = _bigrams(_normFull(a)), y = _bigrams(_normFull(b));
+  if (x.isEmpty || y.isEmpty) return 0;
+  return 2 * x.where(y.contains).length / (x.length + y.length);
+}
+
+class Doubt {
+  final Item item;
+  final String photoName; // что Gemini прочитал на фото
+  Doubt(this.item, this.photoName);
+}
+
+/// Возвращает (перемещено, проверено, сомнительные). null — Gemini недоступен.
+Future<(int, int, List<Doubt>)?> verifyPhotosGemini(void Function(int done, int total) onProgress) async {
+  final verified = (store.settings['photoOk'] ?? '').split(',').toSet();
+  final withPhoto = store.items.where((i) => _exists(i.photo) && !verified.contains(i.id)).toList();
+  final paths = <String>{for (final i in withPhoto) i.photo}.toList();
+  final read = <String, String>{};
+  const batch = 6;
+  for (var k = 0; k < paths.length; k += batch) {
+    onProgress(k, paths.length);
+    final chunk = paths.sublist(k, k + batch < paths.length ? k + batch : paths.length);
+    final names = await geminiReadNames(chunk);
+    if (names == null) {
+      if (read.isEmpty) return null; // Gemini не работает вообще
+      continue;
+    }
+    for (var i = 0; i < chunk.length; i++) {
+      read[chunk[i]] = names[i];
+    }
+  }
+  onProgress(paths.length, paths.length);
+
+  // кандидаты «фото → товар»
+  final cands = <(String, Item, double)>[];
+  final own = <String, double>{};
+  for (final it in withPhoto) {
+    final g = read[it.photo] ?? '';
+    if (_normFull(g).length < 3) continue;
+    own[it.photo] = dice(it.name, g);
+    for (final other in store.items) {
+      final sc = dice(other.name, g);
+      if (sc >= 0.55) cands.add((it.photo, other, sc));
+    }
+  }
+  cands.sort((a, b) => b.$3.compareTo(a.$3));
+
+  final taken = <String>{}, filled = <String>{};
+  final newPhoto = <String, String>{};
+  for (final (photo, item, sc) in cands) {
+    if (taken.contains(photo) || filled.contains(item.id)) continue;
+    final ownerIdx = withPhoto.indexWhere((i) => i.photo == photo && i.id == item.id);
+    if (ownerIdx >= 0) {
+      taken.add(photo);
+      filled.add(item.id);
+      continue; // фото уже у своего товара
+    }
+    if (sc - (own[photo] ?? 0) < 0.12) continue;
+    if (_exists(item.photo)) {
+      final mine = dice(item.name, read[item.photo] ?? '');
+      if (mine >= sc - 0.05) continue; // у товара своё подходящее фото
+    }
+    taken.add(photo);
+    filled.add(item.id);
+    newPhoto[item.id] = photo;
+  }
+
+  final now = DateTime.now().millisecondsSinceEpoch;
+  var moved = 0;
+  final movedPhotos = newPhoto.values.toSet();
+  for (final it in store.items) {
+    final np = newPhoto[it.id];
+    if (np != null) {
+      it.photo = np;
+      moved++;
+    } else if (movedPhotos.contains(it.photo) && !filled.contains(it.id)) {
+      it.photo = ''; // это фото забрал свой товар
+    } else {
+      continue;
+    }
+    it.photoRemote = '';
+    it.updatedAt = now;
+    store.dirtyItems.add(it.id);
+    final p = it.barcode.isNotEmpty ? store.products[it.barcode] : null;
+    if (p != null) {
+      p.photo = it.photo;
+      p.photoRemote = '';
+      p.updatedAt = now;
+      store.dirtyProducts.add(it.barcode);
+    }
+  }
+  if (moved > 0) {
+    await store.save();
+    store.notify();
+    store.onLocalChange?.call();
+  }
+
+  // сомнительные: фото осталось, но прочитанное название плохо совпадает с названием товара
+  final doubts = <Doubt>[];
+  for (final it in store.items) {
+    if (!_exists(it.photo) || verified.contains(it.id)) continue;
+    final g = read[it.photo] ?? '';
+    if (_normFull(g).length < 3) continue;
+    if (dice(it.name, g) < 0.45) doubts.add(Doubt(it, g));
+  }
+  return (moved, paths.length, doubts);
+}
+
+/// Пользователь подтвердил: фото верное — больше не проверять.
+Future<void> markPhotoOk(String id) async {
+  final s = (store.settings['photoOk'] ?? '').split(',').where((e) => e.isNotEmpty).toSet()..add(id);
+  await store.setSetting('photoOk', s.join(','));
 }

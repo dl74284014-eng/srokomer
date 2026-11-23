@@ -96,8 +96,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         await syncer.syncNow();
         final r = await fixPhotos(removeWeb: first);
         if (first) await store.setSetting('photoFix2', '1');
-        if (store.settings['photoRematch1'] != '1' && mounted) {
-          await store.setSetting('photoRematch1', '1');
+        if (store.settings['photoRematch2'] != '1' && mounted) {
+          await store.setSetting('photoRematch2', '1');
           await runRematch(context); // один раз: расставить фото по своим товарам
         }
         if (mounted && (r.$1 > 0 || r.$2 > 0)) {

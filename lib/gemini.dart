@@ -170,3 +170,58 @@ Future<void> geminiWarmUp() async {
     await _client.head(Uri.parse('https://generativelanguage.googleapis.com/')).timeout(const Duration(seconds: 8));
   } catch (_) {}
 }
+
+/// Названия товаров с нескольких фото за один запрос (быстрее и не упирается в лимиты).
+/// Возвращает список той же длины ('' — не прочитано), или null, если Gemini недоступен.
+Future<List<String>?> geminiReadNames(List<String> paths) async {
+  final key = store.geminiKey;
+  if (key.isEmpty || key == _rejectedKey) return null;
+  final parts = <Map<String, Object>>[
+    {
+      'text': 'You get ${paths.length} photos of products from a Korean supermarket, in order. '
+          'For EACH photo return the product name exactly as printed on the package: brand + name + flavor/variant + '
+          'size/count (ml, L, g, kg, 개입, ×N; for multi-packs/combos like "코카콜라 1.5L + 스프라이트 1.5L" include every part). '
+          'Original language, no translation. If a photo has no readable product name, use "". '
+          'Return ONLY JSON: {"names": ["...", "..."]} with exactly ${paths.length} entries in the same order.'
+    },
+  ];
+  for (final p in paths) {
+    parts.add({
+      'inline_data': {'mime_type': 'image/jpeg', 'data': base64Encode(await File(p).readAsBytes())}
+    });
+  }
+  final start = int.tryParse(store.settings['gemVariant'] ?? '') ?? 0;
+  for (var attempt = 0; attempt < 5; attempt++) {
+    final (model, thinking) = _variants[start % _variants.length];
+    final body = jsonEncode({
+      'contents': [
+        {'parts': parts}
+      ],
+      'generationConfig': {
+        'temperature': 0,
+        'maxOutputTokens': 120 * paths.length + 50,
+        'responseMimeType': 'application/json',
+        if (thinking != null) 'thinkingConfig': thinking,
+      },
+    });
+    try {
+      final r = await _post(model, key, body);
+      if (r.statusCode == 429 || r.statusCode >= 500) {
+        await Future.delayed(Duration(seconds: 10 + attempt * 10)); // лимит — подождать и повторить
+        continue;
+      }
+      if (r.statusCode != 200) return null;
+      final j = jsonDecode(utf8.decode(r.bodyBytes));
+      final ps = j['candidates']?[0]?['content']?['parts'];
+      if (ps is! List) return null;
+      final text = ps.map((p) => (p is Map && p['thought'] != true ? (p['text'] ?? '') : '').toString()).join();
+      final mm = RegExp(r'\{[\s\S]*\}').firstMatch(text);
+      if (mm == null) return null;
+      final names = ((jsonDecode(mm.group(0)!) as Map)['names'] as List?) ?? [];
+      return List.generate(paths.length, (i) => i < names.length ? names[i].toString().trim() : '');
+    } catch (_) {
+      await Future.delayed(const Duration(seconds: 3));
+    }
+  }
+  return null;
+}
