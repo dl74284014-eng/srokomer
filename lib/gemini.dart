@@ -49,11 +49,34 @@ Size/weight/volume/count (ml, L, g, kg, 개, 개입, 입, 매, ×N) MUST be incl
 
 final cats_ = cats.map((c) => c.k).toList();
 
+bool _keyInQuery = false;
+String _rejectedKey = ''; // ключ отклонён — до смены ключа не тратим время на Gemini // запомнить, если ключ принимается только в адресе запроса
+
+Future<http.Response> _post(String model, String key, String body) async {
+  Future<http.Response> send(bool inQuery) => _client
+      .post(
+        Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent'
+            '${inQuery ? '?key=${Uri.encodeQueryComponent(key)}' : ''}'),
+        headers: {if (!inQuery) 'x-goog-api-key': key, 'Content-Type': 'application/json'},
+        body: body,
+      )
+      .timeout(const Duration(seconds: 15));
+  var r = await send(_keyInQuery);
+  if (r.statusCode == 401 && !_keyInQuery) {
+    final r2 = await send(true);
+    if (r2.statusCode != 401) {
+      _keyInQuery = true;
+      r = r2;
+    }
+  }
+  return r;
+}
+
 /// null — ключа нет или не удалось (тогда используется ML Kit).
 Future<GeminiResult?> geminiRead(String imagePath) async {
   lastGeminiMs = 0;
   final key = store.geminiKey;
-  if (key.isEmpty) return null;
+  if (key.isEmpty || key == _rejectedKey) return null; // сразу встроенное распознавание
   final sw = Stopwatch()..start();
   final b64 = base64Encode(await File(imagePath).readAsBytes());
   final start = int.tryParse(store.settings['gemVariant'] ?? '') ?? 0;
@@ -79,15 +102,13 @@ Future<GeminiResult?> geminiRead(String imagePath) async {
       },
     });
     try {
-      final r = await _client
-          .post(
-            Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent'),
-            headers: {'x-goog-api-key': key, 'Content-Type': 'application/json'},
-            body: body,
-          )
-          .timeout(const Duration(seconds: 15));
+      final r = await _post(model, key, body);
       // 400/404 — эта модель или настройка не подходит: следующий вариант
       if (r.statusCode == 400 || r.statusCode == 404) continue;
+      if (r.statusCode == 401 || r.statusCode == 403) {
+        _rejectedKey = key;
+        return null;
+      }
       if (r.statusCode != 200) return null;
       if (idx != start) {
         store.settings['gemVariant'] = '$idx';
@@ -122,11 +143,7 @@ Future<String?> testGeminiKey(String key) async {
   String? last;
   for (final (model, thinking) in _variants) {
     try {
-      final r = await _client
-          .post(
-            Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent'),
-            headers: {'x-goog-api-key': key, 'Content-Type': 'application/json'},
-            body: jsonEncode({
+      final r = await _post(model, key, jsonEncode({
               'contents': [
                 {
                   'parts': [
@@ -135,9 +152,7 @@ Future<String?> testGeminiKey(String key) async {
                 }
               ],
               'generationConfig': {'maxOutputTokens': 5, if (thinking != null) 'thinkingConfig': thinking},
-            }),
-          )
-          .timeout(const Duration(seconds: 15));
+            }));
       if (r.statusCode == 200) return null;
       final b = utf8.decode(r.bodyBytes);
       last = 'HTTP ${r.statusCode} ${b.length > 160 ? b.substring(0, 160) : b}';
