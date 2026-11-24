@@ -106,6 +106,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           await runCategorizeAll(context);
           await store.setSetting('catAll1', '1');
         }
+        // один раз: перенести алкоголь из «Напитков» в новую категорию «Алкоголь»
+        if (store.settings['catAlc1'] != '1') {
+          await moveAlcohol();
+          await store.setSetting('catAlc1', '1');
+        }
         if (mounted && (r.$1 > 0 || r.$2 > 0)) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               duration: const Duration(seconds: 6), content: Text(tf('photo_fix_done', {'r': r.$2, 'w': r.$1}))));

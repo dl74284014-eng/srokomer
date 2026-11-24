@@ -401,3 +401,37 @@ Future<void> runCategorizeAll(BuildContext context) async {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(failed && changed == 0 ? t('cat_fail') : tf('cat_done', {'n': changed}))));
 }
+
+
+/// Алкоголь из «Напитков» (и «Другого») — в категорию «Алкоголь»: по словам в названии и, если есть ключ, через Gemini.
+Future<void> moveAlcohol() async {
+  final cand = store.items.where((i) => i.category == 'drink' || i.category == 'other').toList();
+  if (cand.isEmpty) return;
+  final toAlc = <String>{};
+  for (final it in cand) {
+    if (guessCategory('${it.name} ${it.nameRu}') == 'alcohol') toAlc.add(it.id);
+  }
+  if (store.geminiKey.isNotEmpty) {
+    final rest = cand.where((i) => !toAlc.contains(i.id) && i.name.isNotEmpty).toList();
+    for (var s = 0; s < rest.length; s += 40) {
+      final part = rest.sublist(s, s + 40 > rest.length ? rest.length : s + 40);
+      try {
+        final r = await geminiCategorize([for (final i in part) i.name]);
+        if (r == null) break;
+        for (var k = 0; k < part.length && k < r.length; k++) {
+          if (r[k] == 'alcohol') toAlc.add(part[k].id);
+        }
+      } catch (_) {
+        break;
+      }
+    }
+  }
+  for (final it in cand) {
+    if (!toAlc.contains(it.id)) continue;
+    await store.upsertItem(Item.fromJson(it.toJson())..category = 'alcohol');
+    final pr = store.products[it.barcode];
+    if (it.barcode.isNotEmpty && pr != null && pr.category != 'alcohol') {
+      await store.putProduct(it.barcode, Product.fromJson(pr.toJson())..category = 'alcohol');
+    }
+  }
+}

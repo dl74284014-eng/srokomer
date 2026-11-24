@@ -45,7 +45,8 @@ ready: 도시락, 김밥, 삼각김밥, 즉석식품/HMR, 샌드위치, 밀키�
 frozen: 냉동식품, 아이스크림, 만두, 냉동피자
 bread: 빵, 케이크, 베이커리, 떡
 snack: 과자, 초콜릿, 사탕, 젤리, 견과, 쿠키
-drink: 음료 — 탄산음료, 주스, 커피, 차, 생수, 이온/에너지 음료, 홍삼·건강 음료, 술
+drink: 음료 — 탄산음료, 주스, 커피, 차, 생수, 이온/에너지 음료, 홍삼·건강 음료, 무알콜 음료
+alcohol: 주류 — 소주, 맥주, 막걸리, 와인, 하이볼, 위스키, 사케/청주, 과실주, 양주 (any drink containing alcohol)
 sauce: 소스, 장류(고추장/된장/간장), 양념, 조미료, 케첩, 마요네즈, 드레싱
 grocery: 쌀, 즉석밥, 밀가루, 설탕, 소금, 식용유, 통조림, 김(조미김), 시리얼, 잼, 꿀
 other: anything else (non-food, household, gift sets of mixed goods)''';
