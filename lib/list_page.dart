@@ -11,7 +11,8 @@ class ListPage extends StatefulWidget {
   final Urg? urg; // фильтр по сроку
   final String title;
   final bool focusSearch;
-  const ListPage({super.key, this.cat, this.urg, required this.title, this.focusSearch = false});
+  final bool onlyRet; // только помеченные на возврат
+  const ListPage({super.key, this.cat, this.urg, required this.title, this.focusSearch = false, this.onlyRet = false});
 
   @override
   State<ListPage> createState() => _ListPageState();
@@ -66,6 +67,7 @@ class _ListPageState extends State<ListPage> {
           final qq = q.trim().toLowerCase();
           final items = store.items.where((it) {
             if (widget.cat != null && catOf(it.category).k != widget.cat) return false;
+            if (widget.onlyRet && !it.ret) return false;
             if (widget.urg != null) {
               final u = urgency(daysLeft(it.expiry));
               // «неделя» включает и более срочные, «≤3» включает просроченные

@@ -36,11 +36,12 @@ class ItemFormPage extends StatefulWidget {
 }
 
 class _ItemFormPageState extends State<ItemFormPage> {
-  late final TextEditingController name, nameRu, code, notes;
+  late final TextEditingController name, nameRu, code, notes, price;
   final FocusNode nameFocus = FocusNode();
   late String category, expiry, photo;
   late int qty;
   late bool mute;
+  late bool ret;
   bool remember = true;
   bool catManual = false; // категорию выбрали вручную — больше не трогаем
   bool saving = false;
@@ -54,6 +55,8 @@ class _ItemFormPageState extends State<ItemFormPage> {
     nameRu = TextEditingController(text: it.nameRu);
     code = TextEditingController(text: it.barcode);
     notes = TextEditingController(text: it.notes);
+    price = TextEditingController(text: it.price > 0 ? '${it.price}' : '');
+    ret = it.ret;
     category = it.category;
     expiry = it.expiry;
     photo = it.photo;
@@ -287,6 +290,8 @@ class _ItemFormPageState extends State<ItemFormPage> {
       notes: notes.text.trim(),
       qty: qty,
       mute: mute,
+      price: int.tryParse(price.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+      ret: ret,
       photo: photo,
       createdAt: createdAt,
     );
@@ -309,7 +314,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
     }
     if (remember && it.barcode.isNotEmpty) {
       await store.putProduct(it.barcode,
-          Product(name: it.name, nameRu: it.nameRu, category: it.category, photo: it.photo));
+          Product(name: it.name, nameRu: it.nameRu, category: it.category, photo: it.photo, price: it.price));
     }
     if (mounted) Navigator.pop(context, true);
   }
@@ -556,6 +561,26 @@ class _ItemFormPageState extends State<ItemFormPage> {
           ]),
           if (same.isNotEmpty || !widget.isNew) _batchesBox(same),
           gap,
+          TextField(
+            controller: price,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: t('price'),
+              hintText: t('price_hint'),
+              suffixText: '원',
+              prefixIcon: const Icon(Icons.sell_outlined),
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            secondary: Icon(Icons.assignment_return_outlined, color: ret ? const Color(0xFF7B4FD6) : null),
+            title: Text(t('ret_mark')),
+            subtitle: Text(t('ret_sub')),
+            value: ret,
+            onChanged: (v) => setState(() => ret = v),
+          ),
+          const SizedBox(height: 4),
           TextField(
             controller: notes,
             minLines: 2,

@@ -169,7 +169,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final known = store.products[code];
     if (known != null) {
       openItemForm(context, 
-        Item(id: newId(), name: known.name, nameRu: known.nameRu, category: known.category, barcode: code, photo: known.photo),
+        Item(id: newId(), name: known.name, nameRu: known.nameRu, category: known.category, barcode: code, photo: known.photo, price: known.price),
         info: t('known'),
       );
       return;
@@ -350,6 +350,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             () => _open(const CategoriesPage())),
         const SizedBox(height: 8),
         _bigButton('📋', t('all_items'), '${items.length} ${t('pcs')}', () => _open(ListPage(title: t('all_items')))),
+        if (items.any((i) => i.ret)) ...[
+          const SizedBox(height: 8),
+          _bigButton('↩️', t('ret_list'), '${items.where((i) => i.ret).length} ${t('pcs')}',
+              () => _open(ListPage(title: t('ret_list'), onlyRet: true))),
+        ],
         const SizedBox(height: 20),
         // ---- скоро заканчивается ----
         Text(t('soon_title'), style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),

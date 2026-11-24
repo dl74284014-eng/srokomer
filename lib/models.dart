@@ -44,6 +44,8 @@ class Item {
   int createdAt;
   int updatedAt;
   bool mute; // не присылать уведомления об этом товаре
+  int price; // цена в вонах, 0 — не указана
+  bool ret; // помечен на возврат поставщику
 
   Item({
     required this.id,
@@ -57,6 +59,8 @@ class Item {
     this.photo = '',
     this.photoRemote = '',
     this.mute = false,
+    this.price = 0,
+    this.ret = false,
     int? createdAt,
     int? updatedAt,
   })  : createdAt = createdAt ?? DateTime.now().millisecondsSinceEpoch,
@@ -76,6 +80,8 @@ class Item {
         'createdAt': createdAt,
         'updatedAt': updatedAt,
         'mute': mute,
+        'price': price,
+        'ret': ret,
       };
 
   factory Item.fromJson(Map<String, dynamic> j) => Item(
@@ -92,18 +98,22 @@ class Item {
         createdAt: (j['createdAt'] is num) ? (j['createdAt'] as num).toInt() : null,
         updatedAt: (j['updatedAt'] is num) ? (j['updatedAt'] as num).toInt() : 0,
         mute: j['mute'] == true,
+        price: (j['price'] is num) ? (j['price'] as num).toInt() : 0,
+        ret: j['ret'] == true,
       );
 }
 
 class Product {
   String name, nameRu, category, photo, photoRemote;
   int updatedAt;
+  int price;
   Product(
       {this.name = '',
       this.nameRu = '',
       this.category = 'other',
       this.photo = '',
       this.photoRemote = '',
+      this.price = 0,
       this.updatedAt = 0});
   Map<String, dynamic> toJson() => {
         'name': name,
@@ -111,6 +121,7 @@ class Product {
         'category': category,
         'photo': photo,
         'photoRemote': photoRemote,
+        'price': price,
         'updatedAt': updatedAt,
       };
   factory Product.fromJson(Map<String, dynamic> j) => Product(
@@ -119,6 +130,7 @@ class Product {
         category: (j['category'] ?? 'other').toString(),
         photo: (j['photo'] ?? '').toString(),
         photoRemote: (j['photoRemote'] ?? '').toString(),
+        price: (j['price'] is num) ? (j['price'] as num).toInt() : 0,
         updatedAt: (j['updatedAt'] is num) ? (j['updatedAt'] as num).toInt() : 0,
       );
 }

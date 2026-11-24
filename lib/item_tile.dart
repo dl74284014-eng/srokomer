@@ -31,6 +31,7 @@ Future<void> newBatch(BuildContext context, Item base) {
       barcode: base.barcode,
       photo: base.photo,
       mute: base.mute,
+      price: base.price,
     ),
     info: t('batch_new_info'),
     autoDate: true,
@@ -112,7 +113,9 @@ class ItemTile extends StatelessWidget {
     final u = urgency(dl);
     final nb = batchesOf(it.barcode, it.name).length;
     final sub = [
+      if (it.ret) '↩ ${t('ret_short')}',
       '${t('until')} ${fmtDate(it.expiry)}',
+      if (it.price > 0) fmtPrice(it.price),
       if (nb > 1) tf('batches_n', {'n': nb}),
       if (it.qty > 1) '${it.qty} ${t('pcs')}',
       if (it.notes.isNotEmpty) '📝 ${it.notes}',
@@ -198,6 +201,7 @@ Future<void> showItemActions(BuildContext context, Item it) async {
           tile('edit', Icons.edit_outlined, t('act_edit')),
           tile('date', Icons.event_outlined, t('act_date')),
           tile('batch', Icons.add_box_outlined, t('act_batch')),
+          tile('ret', Icons.assignment_return_outlined, it.ret ? t('act_ret_off') : t('act_ret_on')),
           tile('move', Icons.drive_file_move_outline, t('act_move')),
           if (it.photo.isNotEmpty) tile('nophoto', Icons.hide_image_outlined, t('act_nophoto')),
           if (it.qty > 1) tile('minus', Icons.remove_circle_outline, t('act_minus')),
@@ -224,6 +228,8 @@ Future<void> showItemActions(BuildContext context, Item it) async {
         final n = Item.fromJson(it.toJson())..expiry = isoOf(d);
         await store.upsertItem(n);
       }
+    case 'ret':
+      await store.upsertItem(Item.fromJson(it.toJson())..ret = !it.ret);
     case 'batch':
       await newBatch(context, it);
     case 'nophoto':

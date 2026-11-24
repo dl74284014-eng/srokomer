@@ -29,6 +29,8 @@ List<String> _headers() => [
       t('col_left'),
       t('notes'),
       t('col_added'),
+      t('price'),
+      t('ret_short'),
     ];
 
 List<String> _row(Item it) {
@@ -43,6 +45,8 @@ List<String> _row(Item it) {
     dl == null ? '' : '$dl',
     it.notes,
     fmtDate(isoOf(added)),
+    it.price > 0 ? fmtPrice(it.price) : '',
+    it.ret ? '✔' : '',
   ];
 }
 
@@ -71,11 +75,13 @@ Future<File> buildXlsx() async {
           xl.IntCellValue(it.qty)
         else if (i == 5 && dl != null)
           xl.IntCellValue(dl)
+        else if (i == 8 && it.price > 0)
+          xl.IntCellValue(it.price)
         else
           xl.TextCellValue(r[i]),
     ]);
   }
-  const widths = [36.0, 24.0, 16.0, 7.0, 13.0, 12.0, 30.0, 13.0];
+  const widths = [36.0, 24.0, 16.0, 7.0, 13.0, 12.0, 30.0, 13.0, 11.0, 8.0];
   for (var i = 0; i < widths.length; i++) {
     sh.setColumnWidth(i, widths[i]);
   }
@@ -181,7 +187,7 @@ String buildText() {
     ..writeln();
   for (final it in _sortedItems()) {
     final q = it.qty > 1 ? ' ×${it.qty}' : '';
-    b.writeln('${_dot(it)} ${it.name}$q');
+    b.writeln('${_dot(it)} ${it.name}$q${it.price > 0 ? ' · ${fmtPrice(it.price)}' : ''}${it.ret ? ' · ↩ ${t('ret_short')}' : ''}');
     b.writeln('    ${t('until')} ${fmtDate(it.expiry)} · ${leftText(daysLeft(it.expiry))}'
         '${it.notes.isNotEmpty ? ' · 📝 ${it.notes}' : ''}');
   }

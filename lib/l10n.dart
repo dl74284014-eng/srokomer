@@ -114,6 +114,14 @@ const _ru = <String, String>{
   'scan_batches': 'Этот товар уже есть. Выберите партию или добавьте новую:',
   'act_batch': 'Новая партия (другой срок)',
   'this_batch': 'эта',
+  'price': 'Цена',
+  'price_hint': 'необязательно',
+  'ret_mark': 'На возврат поставщику',
+  'ret_sub': 'Пометить товар для возврата (반품)',
+  'ret_short': 'Возврат',
+  'ret_list': 'На возврат',
+  'act_ret_on': 'Пометить на возврат',
+  'act_ret_off': 'Снять пометку возврата',
   'notes': 'Заметки',
   'notes_hint': 'полка, поставщик, скидка…',
   'remember': 'Запомнить товар по штрих-коду',
@@ -351,6 +359,14 @@ const _ko = <String, String>{
   'scan_batches': '이미 등록된 상품입니다. 입고분을 선택하거나 새로 추가하세요:',
   'act_batch': '다른 유통기한 추가',
   'this_batch': '현재',
+  'price': '가격',
+  'price_hint': '선택 사항',
+  'ret_mark': '반품 대상',
+  'ret_sub': '공급업체에 반품할 상품으로 표시',
+  'ret_short': '반품',
+  'ret_list': '반품 목록',
+  'act_ret_on': '반품 대상으로 표시',
+  'act_ret_off': '반품 표시 해제',
   'notes': '메모',
   'notes_hint': '진열대, 거래처, 할인 등…',
   'remember': '바코드로 상품 기억하기',
@@ -519,3 +535,10 @@ const _ko = <String, String>{
   'sort': '정렬',
   'all_good': '모두 양호 — 곧 만료되는 상품이 없습니다',
 };
+
+
+/// Цена: 1,500원
+String fmtPrice(int p) {
+  final s = p.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
+  return '$s원';
+}
