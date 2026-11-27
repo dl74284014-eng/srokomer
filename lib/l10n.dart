@@ -18,7 +18,7 @@ Future<T> inKorean<T>(Future<T> Function() fn) async {
 }
 
 /// Расположение кнопок: 'center' (по умолчанию), 'left' — для левшей, 'right' — для правшей.
-String get hand => store.settings['hand'] ?? 'center';
+String get hand => store.settings['hand'] ?? 'left';
 
 String t(String k) => (isKo ? _ko[k] : _ru[k]) ?? _ru[k] ?? k;
 

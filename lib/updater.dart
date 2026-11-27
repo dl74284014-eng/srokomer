@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'widgets.dart';
 import 'l10n.dart';
 import 'store.dart';
 
@@ -92,10 +93,10 @@ Future<void> offerUpdate(BuildContext context, {bool manual = false}) async {
     builder: (ctx) => AlertDialog(
       title: Text('⬆️ ${t('upd_title')}'),
       content: Text(tf('upd_text', {'v': u.name})),
-      actions: [
+      actions: acts([
         TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('upd_later'))),
         FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('upd_now'))),
-      ],
+      ]),
     ),
   );
   if (ok != true || !context.mounted) return;

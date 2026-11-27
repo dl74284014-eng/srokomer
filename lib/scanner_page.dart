@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'widgets.dart';
 import 'l10n.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -55,10 +56,10 @@ class _ScannerPageState extends State<ScannerPage> {
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(hintText: '8801234567890'),
         ),
-        actions: [
+        actions: acts([
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t('cancel'))),
           FilledButton(onPressed: () => Navigator.pop(ctx, c.text.trim()), child: Text(t('done'))),
-        ],
+        ]),
       ),
     );
     if (v != null && v.isNotEmpty && mounted) {
@@ -94,6 +95,7 @@ class _ScannerPageState extends State<ScannerPage> {
             child: Padding(
               padding: const EdgeInsets.all(8),
               child: Row(
+                textDirection: hand == 'left' ? TextDirection.rtl : TextDirection.ltr,
                 children: [
                   IconButton.filledTonal(
                     onPressed: () => Navigator.pop(context),

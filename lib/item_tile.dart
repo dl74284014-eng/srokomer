@@ -252,14 +252,14 @@ Future<void> showItemActions(BuildContext context, Item it) async {
         builder: (ctx) => AlertDialog(
           title: Text(tf('delete_q', {'name': it.name})),
           content: Text(t('delete_sub')),
-          actions: [
+          actions: acts([
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('cancel'))),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: const Color(0xFFD6363B)),
               onPressed: () => Navigator.pop(ctx, true),
               child: Text(t('delete')),
             ),
-          ],
+          ]),
         ),
       );
       if (ok == true) await store.deleteItem(it.id);

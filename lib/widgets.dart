@@ -10,6 +10,25 @@ import 'photo_review_page.dart';
 import 'store.dart';
 import 'l10n.dart';
 
+/// Кнопки диалога: для левшей главная кнопка — слева.
+List<Widget> acts(List<Widget> l) => hand == 'left' ? l.reversed.toList() : l;
+
+/// Шапка экрана: для левшей кнопки — слева (рядом со «Назад»), заголовок — справа.
+AppBar handBar({required Widget title, List<Widget> actions = const [], double? titleSpacing}) {
+  if (hand != 'left' || actions.isEmpty) {
+    return AppBar(title: title, actions: actions, titleSpacing: titleSpacing);
+  }
+  return AppBar(
+    titleSpacing: 0,
+    title: Row(children: [
+      ...actions.reversed,
+      const SizedBox(width: 6),
+      Expanded(child: Align(alignment: Alignment.centerRight, child: title)),
+      const SizedBox(width: 14),
+    ]),
+  );
+}
+
 MainAxisAlignment get dialogAlign =>
     hand == 'left' ? MainAxisAlignment.start : (hand == 'right' ? MainAxisAlignment.end : MainAxisAlignment.center);
 
@@ -347,10 +366,10 @@ Future<String?> askCategory(BuildContext context, String suggest) async {
         Expanded(child: Text(catName(c), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800))),
       ]),
       actionsAlignment: dialogAlign,
-      actions: [
+      actions: acts([
         TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('cat_other'))),
         FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('yes'))),
-      ],
+      ]),
     ),
   );
   if (ok == true) return suggest;

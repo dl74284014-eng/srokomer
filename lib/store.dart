@@ -196,7 +196,7 @@ class Store extends ChangeNotifier {
 
   Future<void> setSetting(String k, String v) async {
     settings[k] = v;
-    if (k == 'lang') notifyListeners();
+    if (k == 'lang' || k == 'hand') notifyListeners();
     await save();
   }
 

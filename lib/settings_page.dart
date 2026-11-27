@@ -268,10 +268,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   builder: (ctx) => AlertDialog(
                     title: Text(t('acc_logout_q')),
                     content: Text(t('acc_logout_sub')),
-                    actions: [
+                    actions: acts([
                       TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('cancel'))),
                       FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('acc_logout'))),
-                    ],
+                    ]),
                   ),
                 );
                 if (ok == true) await auth.signOut();

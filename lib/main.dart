@@ -48,6 +48,7 @@ class SrokomerApp extends StatelessWidget {
           colorSchemeSeed: brand,
           scaffoldBackgroundColor: bg,
           appBarTheme: const AppBarTheme(backgroundColor: bg, surfaceTintColor: Colors.transparent),
+          dialogTheme: DialogThemeData(actionsAlignment: dialogAlign),
         ),
         darkTheme: ThemeData(
           useMaterial3: true,
@@ -57,6 +58,7 @@ class SrokomerApp extends StatelessWidget {
           scaffoldBackgroundColor: Colors.black,
           canvasColor: Colors.black,
           appBarTheme: const AppBarTheme(backgroundColor: Colors.black, surfaceTintColor: Colors.transparent),
+          dialogTheme: DialogThemeData(actionsAlignment: dialogAlign),
         ),
         locale: Locale(lang),
         supportedLocales: const [Locale('ru'), Locale('ko'), Locale('en')],
@@ -105,6 +107,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         if (store.settings['catAll1'] != '1' && store.items.isNotEmpty && store.geminiKey.isNotEmpty && mounted) {
           await runCategorizeAll(context);
           await store.setSetting('catAll1', '1');
+        }
+        // один раз: включить раскладку для левой руки
+        if (store.settings['handLeft1'] != '1') {
+          await store.setSetting('handLeft1', '1');
+          await store.setSetting('hand', 'left');
         }
         // один раз: перенести алкоголь из «Напитков» в новую категорию «Алкоголь»
         if (store.settings['catAlc1'] != '1') {
@@ -197,15 +204,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: handBar(
         titleSpacing: 12,
-        title: Row(children: [
+        title: Row(mainAxisSize: MainAxisSize.min, children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(9),
             child: Image.asset('assets/icon.png', width: 36, height: 36),
           ),
           const SizedBox(width: 10),
-          const Text('L할인마트 유통기한', style: TextStyle(fontWeight: FontWeight.w800)),
+          const Flexible(child: Text('L할인마트 유통기한', overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w800))),
         ]),
         actions: [
           ListenableBuilder(

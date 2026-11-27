@@ -248,10 +248,10 @@ class _ItemFormPageState extends State<ItemFormPage> {
         builder: (ctx) => AlertDialog(
           title: Text(t('no_exp_title')),
           content: Text(t('no_exp_text')),
-          actions: [
+          actions: acts([
             TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('without_date'))),
             FilledButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('set_date'))),
-          ],
+          ]),
         ),
       );
       if (ok != true) {
@@ -325,14 +325,14 @@ class _ItemFormPageState extends State<ItemFormPage> {
       builder: (ctx) => AlertDialog(
         title: Text(tf('delete_q', {'name': name.text})),
         content: Text(t('delete_sub')),
-        actions: [
+        actions: acts([
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('cancel'))),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFFD6363B)),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(t('delete')),
           ),
-        ],
+        ]),
       ),
     );
     if (ok == true) {
@@ -386,7 +386,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
     const gap = SizedBox(height: 14);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: handBar(
         title: Text(widget.isNew ? t('new_item') : t('item')),
         actions: [
           if (!widget.isNew)

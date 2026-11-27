@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'item_tile.dart';
+import 'widgets.dart';
 import 'l10n.dart';
 import 'models.dart';
 import 'store.dart';
@@ -43,8 +44,8 @@ class _ListPageState extends State<ListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
+      appBar: handBar(
+        title: Text(widget.title, overflow: TextOverflow.ellipsis),
         actions: [
           PopupMenuButton<String>(
             tooltip: t('sort'),
