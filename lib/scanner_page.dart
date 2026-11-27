@@ -56,6 +56,7 @@ class _ScannerPageState extends State<ScannerPage> {
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(hintText: '8801234567890'),
         ),
+        actionsAlignment: dialogAlign,
         actions: acts([
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t('cancel'))),
           FilledButton(onPressed: () => Navigator.pop(ctx, c.text.trim()), child: Text(t('done'))),

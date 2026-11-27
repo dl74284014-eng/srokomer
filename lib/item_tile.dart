@@ -252,6 +252,7 @@ Future<void> showItemActions(BuildContext context, Item it) async {
         builder: (ctx) => AlertDialog(
           title: Text(tf('delete_q', {'name': it.name})),
           content: Text(t('delete_sub')),
+          actionsAlignment: dialogAlign,
           actions: acts([
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('cancel'))),
             FilledButton(

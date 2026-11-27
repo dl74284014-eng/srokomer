@@ -248,6 +248,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
         builder: (ctx) => AlertDialog(
           title: Text(t('no_exp_title')),
           content: Text(t('no_exp_text')),
+          actionsAlignment: dialogAlign,
           actions: acts([
             TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('without_date'))),
             FilledButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('set_date'))),
@@ -325,6 +326,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
       builder: (ctx) => AlertDialog(
         title: Text(tf('delete_q', {'name': name.text})),
         content: Text(t('delete_sub')),
+        actionsAlignment: dialogAlign,
         actions: acts([
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('cancel'))),
           FilledButton(

@@ -48,7 +48,6 @@ class SrokomerApp extends StatelessWidget {
           colorSchemeSeed: brand,
           scaffoldBackgroundColor: bg,
           appBarTheme: const AppBarTheme(backgroundColor: bg, surfaceTintColor: Colors.transparent),
-          dialogTheme: DialogThemeData(actionsAlignment: dialogAlign),
         ),
         darkTheme: ThemeData(
           useMaterial3: true,
@@ -58,7 +57,6 @@ class SrokomerApp extends StatelessWidget {
           scaffoldBackgroundColor: Colors.black,
           canvasColor: Colors.black,
           appBarTheme: const AppBarTheme(backgroundColor: Colors.black, surfaceTintColor: Colors.transparent),
-          dialogTheme: DialogThemeData(actionsAlignment: dialogAlign),
         ),
         locale: Locale(lang),
         supportedLocales: const [Locale('ru'), Locale('ko'), Locale('en')],

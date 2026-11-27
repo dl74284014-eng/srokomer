@@ -93,6 +93,7 @@ Future<void> offerUpdate(BuildContext context, {bool manual = false}) async {
     builder: (ctx) => AlertDialog(
       title: Text('⬆️ ${t('upd_title')}'),
       content: Text(tf('upd_text', {'v': u.name})),
+      actionsAlignment: dialogAlign,
       actions: acts([
         TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('upd_later'))),
         FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('upd_now'))),
