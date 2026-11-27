@@ -440,7 +440,15 @@ class _SettingsPageState extends State<SettingsPage> {
           _syncBlock(),
           const SizedBox(height: 12),
           _notifBlock(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
+          SwitchListTile(
+            secondary: const Icon(Icons.auto_fix_high),
+            title: Text(t('bg_setting')),
+            subtitle: Text(t('bg_setting_sub')),
+            value: store.settings['cleanBg'] != '0',
+            onChanged: (v) => _set('cleanBg', v ? '1' : '0'),
+          ),
+          const SizedBox(height: 12),
           FilledButton.tonalIcon(
             onPressed: () async {
               final r = await withLoading(context, t('photo_fixing'), () => fixPhotos(removeWeb: true));

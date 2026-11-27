@@ -16,6 +16,10 @@ fi
 if ! grep -q 'android.permission.CAMERA' "$M"; then
   sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.CAMERA"/>\n    <application#' "$M"
 fi
+# Модель «убрать фон» скачивается заранее
+if ! grep -q 'subject_segment' "$M"; then
+  sed -i 's#</application>#<meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="subject_segment,ocr"/>\n    </application>#' "$M"
+fi
 # Название под значком
 sed -i 's#android:label="[^"]*"#android:label="@string/app_name"#' "$M"
 mkdir -p android/app/src/main/res/values android/app/src/main/res/values-ko

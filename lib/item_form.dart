@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'l10n.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'clean_photo.dart';
 import 'gemini.dart';
 import 'item_tile.dart';
 import 'lookup.dart';
@@ -39,6 +40,8 @@ class _ItemFormPageState extends State<ItemFormPage> {
   late final TextEditingController name, nameRu, code, notes, price;
   final FocusNode nameFocus = FocusNode();
   late String category, expiry, photo;
+  String origPhoto = ''; // фото с фоном (до «как сканер»)
+  bool cleaning = false;
   late int qty;
   late bool mute;
   late bool ret;
@@ -112,8 +115,49 @@ class _ItemFormPageState extends State<ItemFormPage> {
     if (x == null || !mounted) return;
     final p = await store.savePhotoFile(x.path, itemId: widget.item.id);
     if (!mounted) return;
-    setState(() => photo = p);
+    setState(() {
+      photo = p;
+      origPhoto = '';
+    });
+    // «Как сканер»: убрать фон и кадрировать по товару — параллельно с распознаванием названия
+    Future<String?>? clean;
+    if (store.settings['cleanBg'] != '0') {
+      setState(() => cleaning = true);
+      clean = cleanProductPhoto(p).then((b) async {
+        if (b == null) return null;
+        return store.savePhotoBytes(b, name: '${widget.item.id}__${newId()}.jpg');
+      }).catchError((_) => null);
+    }
     await _ocrName(p);
+    if (clean != null) {
+      final c = await clean;
+      if (!mounted) return;
+      setState(() {
+        cleaning = false;
+        if (c != null && photo == p) {
+          photo = c;
+          origPhoto = p;
+        }
+      });
+    }
+  }
+
+  /// Убрать фон у уже имеющегося фото (кнопка под фото).
+  Future<void> _cleanNow() async {
+    final p = photo;
+    setState(() => cleaning = true);
+    final b = await cleanProductPhoto(p);
+    String? c;
+    if (b != null) c = await store.savePhotoBytes(b, name: '${widget.item.id}__${newId()}.jpg');
+    if (!mounted) return;
+    setState(() {
+      cleaning = false;
+      if (c != null && photo == p) {
+        photo = c;
+        origPhoto = p;
+      }
+    });
+    if (c == null) _snack(t('bg_fail'));
   }
 
   // ---------- считать название ----------
@@ -409,12 +453,47 @@ class _ItemFormPageState extends State<ItemFormPage> {
             child: Container(
               height: 190,
               color: P.photoBg,
-              child: photo.isNotEmpty && File(photo).existsSync()
-                  ? Image.file(File(photo), fit: BoxFit.contain)
-                  : const Center(child: Text('📦', style: TextStyle(fontSize: 56))),
+              child: Stack(fit: StackFit.expand, children: [
+                photo.isNotEmpty && File(photo).existsSync()
+                    ? Image.file(File(photo), fit: BoxFit.contain)
+                    : const Center(child: Text('📦', style: TextStyle(fontSize: 56))),
+                if (cleaning)
+                  Positioned(
+                    left: 8,
+                    bottom: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(10)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                        const SizedBox(width: 8),
+                        Text(t('bg_cleaning'), style: const TextStyle(color: Colors.white, fontSize: 13)),
+                      ]),
+                    ),
+                  ),
+              ]),
             ),
           ),
-          const SizedBox(height: 8),
+          if (!cleaning && photo.isNotEmpty && File(photo).existsSync())
+            Align(
+              alignment: _btnLeft ? Alignment.centerLeft : Alignment.centerRight,
+              child: origPhoto.isNotEmpty
+                  ? TextButton.icon(
+                      onPressed: () => setState(() {
+                        photo = origPhoto;
+                        origPhoto = '';
+                      }),
+                      icon: const Icon(Icons.undo, size: 18),
+                      label: Text(t('bg_undo')),
+                    )
+                  : TextButton.icon(
+                      onPressed: _cleanNow,
+                      icon: const Icon(Icons.auto_fix_high, size: 18),
+                      label: Text(t('bg_remove')),
+                    ),
+            )
+          else
+            const SizedBox(height: 8),
           Row(children: [
             Expanded(
               child: OutlinedButton.icon(
