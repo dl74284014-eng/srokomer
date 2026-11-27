@@ -448,6 +448,16 @@ class _SettingsPageState extends State<SettingsPage> {
             value: store.settings['cleanBg'] != '0',
             onChanged: (v) => _set('cleanBg', v ? '1' : '0'),
           ),
+          FilledButton.tonalIcon(
+            onPressed: () => runCleanAll(context),
+            icon: const Icon(Icons.auto_fix_high),
+            label: Text(t('bg_all')),
+          ),
+          TextButton.icon(
+            onPressed: () => runRestoreAllBg(context),
+            icon: const Icon(Icons.undo),
+            label: Text(t('bg_restore_all')),
+          ),
           const SizedBox(height: 12),
           FilledButton.tonalIcon(
             onPressed: () async {

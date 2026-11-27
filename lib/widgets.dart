@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'clean_photo.dart';
 import 'gemini.dart';
 import 'lookup.dart';
 import 'models.dart';
@@ -453,4 +455,119 @@ Future<void> moveAlcohol() async {
       await store.putProduct(it.barcode, Product.fromJson(pr.toJson())..category = 'alcohol');
     }
   }
+}
+
+
+/// Карта «фото без фона → оригинал» (только на этом телефоне) — чтобы можно было всё вернуть.
+Map<String, String> _bgMap() {
+  try {
+    return Map<String, String>.from(jsonDecode(store.settings['bgOrig'] ?? '{}') as Map);
+  } catch (_) {
+    return {};
+  }
+}
+
+bool isCleanPhoto(String p) => p.split('/').last.contains('__bg');
+
+Future<void> rememberBgOrig(String clean, String orig) async {
+  final m = _bgMap()..[clean] = orig;
+  await store.setSetting('bgOrig', jsonEncode(m));
+}
+
+Future<void> _progressDialog(BuildContext context, ValueNotifier<String> prog, ValueNotifier<bool> stop) {
+  return showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => PopScope(
+      canPop: false,
+      child: AlertDialog(
+        content: Row(children: [
+          const SizedBox(width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 3)),
+          const SizedBox(width: 14),
+          Expanded(child: ValueListenableBuilder<String>(valueListenable: prog, builder: (_, v, __) => Text(v))),
+        ]),
+        actionsAlignment: dialogAlign,
+        actions: [
+          TextButton(onPressed: () => stop.value = true, child: Text(t('cancel'))),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Массово: убрать фон у всех фото товаров (оригиналы остаются на телефоне).
+Future<void> runCleanAll(BuildContext context) async {
+  final todo = store.items
+      .where((i) => i.photo.isNotEmpty && !isCleanPhoto(i.photo) && File(i.photo).existsSync())
+      .toList();
+  final photos = todo.map((i) => i.photo).toSet();
+  if (photos.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('bg_all_none'))));
+    return;
+  }
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(tf('bg_all_q', {'n': photos.length})),
+      content: Text(t('bg_all_sub')),
+      actionsAlignment: dialogAlign,
+      actions: acts([
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t('cancel'))),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t('bg_remove'))),
+      ]),
+    ),
+  );
+  if (ok != true || !context.mounted) return;
+  final prog = ValueNotifier<String>('${t('bg_cleaning')} 0 / ${photos.length}');
+  final stop = ValueNotifier<bool>(false);
+  _progressDialog(context, prog, stop);
+  final done = <String, String>{}; // старое фото → новое
+  var n = 0, fail = 0;
+  for (final src in photos) {
+    if (stop.value) break;
+    n++;
+    prog.value = '${t('bg_cleaning')} $n / ${photos.length}';
+    final b = await cleanProductPhoto(src);
+    if (b == null) {
+      fail++;
+      continue;
+    }
+    final owner = todo.firstWhere((i) => i.photo == src).id;
+    final dst = await store.savePhotoBytes(b, name: '${owner}__bg${newId()}.jpg');
+    done[src] = dst;
+    await rememberBgOrig(dst, src);
+    // сразу ставим новое фото всем товарам/партиям с этим фото
+    for (final it in store.items.where((i) => i.photo == src).toList()) {
+      await store.upsertItem(Item.fromJson(it.toJson())..photo = dst);
+    }
+    for (final e in store.products.entries.where((e) => e.value.photo == src).toList()) {
+      await store.putProduct(e.key, Product.fromJson(e.value.toJson())..photo = dst);
+    }
+  }
+  if (!context.mounted) return;
+  Navigator.of(context, rootNavigator: true).pop();
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      duration: const Duration(seconds: 6),
+      content: Text(tf('bg_all_done', {'ok': done.length, 'fail': fail}))));
+}
+
+/// Вернуть все фото с фоном (оригиналы).
+Future<void> runRestoreAllBg(BuildContext context) async {
+  final m = _bgMap();
+  var c = 0;
+  for (final it in store.items.toList()) {
+    final o = m[it.photo];
+    if (o != null && File(o).existsSync()) {
+      await store.upsertItem(Item.fromJson(it.toJson())..photo = o);
+      c++;
+    }
+  }
+  for (final e in store.products.entries.toList()) {
+    final o = m[e.value.photo];
+    if (o != null && File(o).existsSync()) {
+      await store.putProduct(e.key, Product.fromJson(e.value.toJson())..photo = o);
+    }
+  }
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tf('bg_restored', {'n': c}))));
 }

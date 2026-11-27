@@ -125,7 +125,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
       setState(() => cleaning = true);
       clean = cleanProductPhoto(p).then((b) async {
         if (b == null) return null;
-        return store.savePhotoBytes(b, name: '${widget.item.id}__${newId()}.jpg');
+        return store.savePhotoBytes(b, name: '${widget.item.id}__bg${newId()}.jpg');
       }).catchError((_) => null);
     }
     await _ocrName(p);
@@ -137,6 +137,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
         if (c != null && photo == p) {
           photo = c;
           origPhoto = p;
+          rememberBgOrig(c, p);
         }
       });
     }
@@ -148,7 +149,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
     setState(() => cleaning = true);
     final b = await cleanProductPhoto(p);
     String? c;
-    if (b != null) c = await store.savePhotoBytes(b, name: '${widget.item.id}__${newId()}.jpg');
+    if (b != null) c = await store.savePhotoBytes(b, name: '${widget.item.id}__bg${newId()}.jpg');
     if (!mounted) return;
     setState(() {
       cleaning = false;
