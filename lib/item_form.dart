@@ -89,8 +89,14 @@ class _ItemFormPageState extends State<ItemFormPage> {
     super.dispose();
   }
 
-  void _snack(String t) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t)));
+  bool get _btnLeft => hand != 'right';
+
+  void _snack(String t) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(t),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 100),
+        duration: const Duration(seconds: 3),
+      ));
 
   Future<XFile?> _shoot({bool camera = true}) => picker.pickImage(
         source: camera ? ImageSource.camera : ImageSource.gallery,
@@ -177,16 +183,10 @@ class _ItemFormPageState extends State<ItemFormPage> {
       name.text = picked;
       photo = saved;
     });
-    // Категория: предлагает Gemini (или словарь), и спрашиваем — верно ли
+    // Категория: ставим сразу (Gemini или словарь), без вопроса — поменять можно вручную
     if (!catManual && mounted) {
-      final suggest = gCat != 'other' ? gCat : guessCategory(picked);
-      final c = await askCategory(context, suggest);
-      if (c != null && mounted) {
-        setState(() {
-          category = c;
-          catManual = true;
-        });
-      }
+      final c = gCat != 'other' ? gCat : guessCategory(picked);
+      if (c != 'other') setState(() => category = c);
     }
   }
 
@@ -433,7 +433,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
 
           gap,
           // название
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(textDirection: _btnLeft ? TextDirection.rtl : TextDirection.ltr, crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(
               child: TextField(
                 controller: name,
@@ -475,7 +475,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
           Text(t('exp_title'),
               style: TextStyle(color: P.muted, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
-          Row(children: [
+          Row(textDirection: _btnLeft ? TextDirection.rtl : TextDirection.ltr, children: [
             Expanded(
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
@@ -615,7 +615,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
           child: SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
               child: FilledButton(
                 style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                 onPressed: saving ? null : _save,
